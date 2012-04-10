@@ -135,7 +135,7 @@ public class ScatterPlotView extends Widget {
 
 	public void start() {
 		maxXY = Math.max(spModel.getMaxX(), spModel.getMaxY());
-		camera = new Camera(maxXY);
+		camera = new Camera(-maxXY, maxXY, -maxXY, maxXY, -2*maxXY, 2*maxXY);
 
 /*		Vector<Vector<Object>> tempTable = new Vector<Vector<Object>>();
 		for(ExpressionData e : dataTable){

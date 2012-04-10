@@ -7,14 +7,7 @@ import org.lwjgl.opengl.GL11;
 public class Camera {
 
     private static final float MOUSE_SENSITIVITY = 0.5f;
-    private static final float ZOOM_SENSITIVITY = 10f;
     private static final float KEY_SENSITIVITY = 1000f;
-    private static final float WHEEL_SENSITIVITY = 3.0f;
-    private static final float MIN_ANGLE = 80.0f; //180
-    private static final float MAX_ZOOM_IN = 1f;
-    private static final float MAX_ZOOM_OUT = Float.MAX_VALUE;// 26.0f;
-    private static final float ZOOM_OFFSET = 1f;
-    private static final float ZOOM_OFFSET_SPEED = 0.1f;
 
     // Angle coordinates of the camera
     private float xAngle = 0f;
@@ -25,14 +18,8 @@ public class Camera {
     private float yPos = 0f;
     private float zPos = 0f;
 
-    private float zoom = 1.0f;
-
-
-    private boolean zoomIn;
-    private boolean zoomOut;
-    private boolean zoomInSmooth;
-    private boolean zoomOutSmooth;
-    private float finalZoom;
+    private float zoomInFactor = 0.75f;
+    private float zoomOutFactor = 1.33f;
 
     private boolean leftClick = false;
     private boolean rightClick = false;
@@ -49,12 +36,24 @@ public class Camera {
     private float yleftPrevious = 0.0f;
     private float yleftDiff = 0.0f;
 
-    private double zoomMax;
+    
+    
+    
+    //setting viewing volumne
+    private double left_plane;
+    private double right_plane;
+    private double bottom_plane;
+    private double top_plane;
+    private double near_plane;
+    private double far_plane;
 
-    private boolean freeMode = true;
-
-    public Camera(double zoomMax){
-    	this.zoomMax = zoomMax;
+    public Camera(double left_plane, double right_plane, double bottom_plane, double top_plane, double near_plane, double far_plane){
+    	this.left_plane = left_plane;
+    	this.right_plane = right_plane;
+    	this.bottom_plane = bottom_plane;
+    	this.top_plane = top_plane;
+    	this.near_plane = near_plane;
+    	this.far_plane = far_plane;
     }
 
     public void getInput(){
@@ -62,9 +61,6 @@ public class Camera {
         // Catch user's mouse input
         getMouseInput();
         getKeyInput();
-        // Provide a smooth effect
-        smoothZoom();
-
     }
 
     /**
@@ -115,10 +111,7 @@ public class Camera {
             yAngle = yAngle + yrightDiff*MOUSE_SENSITIVITY;
 
             float minAngle;
-            if (freeMode)
-                minAngle = 180.0f;
-            else
-                minAngle = MIN_ANGLE;
+            minAngle = 180.0f;
 
             // Don't go below floor
             yAngle = Math.min(yAngle, minAngle);
@@ -143,54 +136,21 @@ public class Camera {
         int wheelMovement = Mouse.getDWheel();
         // If scrolled up
         if (wheelMovement > 0){
-            zoomIn = true;
-            zoomOutSmooth = false;
-            zoom += ZOOM_SENSITIVITY * WHEEL_SENSITIVITY;
+        	this.bottom_plane *= zoomInFactor;
+        	this.top_plane *= zoomInFactor;
+        	this.left_plane *= zoomInFactor;
+        	this.right_plane *= zoomInFactor;
         }
-        else if (zoomIn){
-            finalZoom = zoom - ZOOM_OFFSET;
-            zoomInSmooth = true;
-            zoomIn = false;
-        }
-
         // If scrolled down
         if (wheelMovement < 0){
-            zoomOut = true;
-            zoomInSmooth = false;
-            zoom -= ZOOM_SENSITIVITY * WHEEL_SENSITIVITY;
-        }
-        else if (zoomOut){
-            finalZoom = zoom + ZOOM_OFFSET;
-            zoomOutSmooth = true;
-            zoomOut = false;
+        	this.bottom_plane *= zoomOutFactor;
+        	this.top_plane *= zoomOutFactor;
+        	this.left_plane *= zoomOutFactor;
+        	this.right_plane *= zoomOutFactor;
         }
 
     }
     private void getKeyInput(){
-
-        // If PgUp is pressed
-        if (Keyboard.isKeyDown(Keyboard.KEY_PRIOR)) {
-            zoomIn = true;
-            zoomOutSmooth = false;
-            zoom -= ZOOM_SENSITIVITY;
-        }
-        else if (zoomIn){
-            finalZoom = zoom - ZOOM_OFFSET;
-            zoomInSmooth = true;
-            zoomIn = false;
-        }
-
-        // If PgDn is pressed
-        if (Keyboard.isKeyDown(Keyboard.KEY_NEXT)) {
-            zoomOut = true;
-            zoomInSmooth = false;
-            zoom += ZOOM_SENSITIVITY;
-        }
-        else if (zoomOut){
-            finalZoom = zoom + ZOOM_OFFSET;
-            zoomOutSmooth = true;
-            zoomOut = false;
-        }
 
         // If direction buttons are pressed
         if (Keyboard.isKeyDown(Keyboard.KEY_W)) {
@@ -213,31 +173,6 @@ public class Camera {
         }
 
     }
-    /**
-	 * Make a smoothing effect when zooming. The final zoom level will be
-     * extended a little bit more
-	 */
-    private void smoothZoom(){
-        // If a zoom smoothing effect is required
-        if (zoomInSmooth || zoomOutSmooth){
-            if (finalZoom > MAX_ZOOM_IN || finalZoom < MAX_ZOOM_OUT){
-                if (zoomInSmooth){
-                    // If the final zoom level hasn't been reached yet
-                    if (finalZoom + 0.0001 < zoom)
-                        zoom -= ( (zoom - finalZoom) * ZOOM_OFFSET_SPEED);
-                    else
-                        zoomInSmooth = false;
-                }
-                else if (zoomOutSmooth){
-                    // If the final zoom level hasn't been reached yet
-                    if (finalZoom - 0.0001 > zoom)
-                        zoom += ( (finalZoom - zoom) * ZOOM_OFFSET_SPEED);
-                    else
-                        zoomOutSmooth = false;
-                }
-            }
-        }
-    }
     public void setView(String mode){
     	if(mode.compareTo("XY")==0){
     		xPos = 0;
@@ -245,7 +180,6 @@ public class Camera {
     		zPos = 0;
     		xAngle = 0;
     		yAngle = 0;
-    		zoom = 1f;
     	}
     	else if(mode.compareTo("YZ")==0){
     		xPos = 0;
@@ -253,7 +187,6 @@ public class Camera {
     		zPos = 0;
     		xAngle = 90;
     		yAngle = 90;
-    		zoom = 1f;
 
     	}
     	else if(mode.compareTo("XZ")==0){
@@ -262,7 +195,6 @@ public class Camera {
     		zPos = 0;
     		xAngle = 0;
     		yAngle = 90;
-    		zoom = 1f;
     	}
     }
 
@@ -276,10 +208,8 @@ public class Camera {
         moveFree();
     }
     private void zoom(){
-    	GL11.glOrtho(-zoomMax, zoomMax,
-				-zoomMax, zoomMax, Integer.MIN_VALUE, Integer.MAX_VALUE);
+    	GL11.glOrtho(left_plane, right_plane, bottom_plane, top_plane, near_plane, far_plane);
     }
-
     /**
 	 * Move the camera in free mode
 	 */
@@ -288,21 +218,10 @@ public class Camera {
 		GL11.glLoadIdentity();
 		zPos = Math.min(0, zPos);
 
-        zoom = Math.max(zoom, MAX_ZOOM_IN);
-        zoom = Math.min(zoom, MAX_ZOOM_OUT);
-
         // Check for room boundaries
 
         GL11.glRotatef(-yAngle, 1.0f, 0.0f, 0.0f);
         GL11.glRotatef(xAngle, 0.0f, 0.0f, 1.0f);
         GL11.glTranslatef(-xPos, -yPos, zPos);
-        GL11.glScalef(zoom, zoom, zoom);
-    }
-
-    /**
-	 * Change the camera mode
-	 */
-    public void changeMode(){
-        freeMode = !freeMode;
     }
 }
