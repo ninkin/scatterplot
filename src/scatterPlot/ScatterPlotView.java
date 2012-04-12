@@ -18,6 +18,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.sql.Connection;
@@ -42,6 +43,7 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.plaf.SliderUI;
 import javax.swing.plaf.basic.BasicSliderUI;
+import javax.tools.Tool;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
@@ -57,6 +59,7 @@ import org.lwjgl.util.glu.GLUtessellator;
 
 import de.matthiasmann.twl.Button;
 import de.matthiasmann.twl.GUI;
+import de.matthiasmann.twl.Label;
 import de.matthiasmann.twl.TextArea;
 import de.matthiasmann.twl.Widget;
 import de.matthiasmann.twl.renderer.lwjgl.LWJGLRenderer;
@@ -71,7 +74,6 @@ public class ScatterPlotView extends Widget {
 	private final static AtomicReference<Dimension> newCanvasSize = new AtomicReference<Dimension>();
 	boolean closeRequested = false;
 
-	JLabel nameLabel = new JLabel();
 	//camera
 	private static Camera camera;
 
@@ -93,12 +95,17 @@ public class ScatterPlotView extends Widget {
 
 	//to tesselate
 	int tessList;
-	private GLUtessellator tesselator;
+	//private GLUtessellator tesselator;
 	ThemeManager themeManager;
 
 	//to print text
-	Button toolTipBox = new Button();
+	Label toolTipBox = new Label();
 
+
+	//axis
+	Label xAxisLabel = new Label("X");
+	Label yAxisLabel = new Label("Y");
+	Label zAxisLabel = new Label("Z");
 
 	public ScatterPlotView(List<ExpressionData> dataTable){
 		this.dataTable = dataTable;
@@ -203,9 +210,7 @@ public class ScatterPlotView extends Widget {
 
 
 		final Canvas canvas = new Canvas();
-		canvas.setPreferredSize(new Dimension(1000,700));
-
-		nameLabel.setMinimumSize(new Dimension(1000, 20));
+		canvas.setSize(new Dimension(1000,700));
 
 
 
@@ -234,7 +239,6 @@ public class ScatterPlotView extends Widget {
 		JPanel centerPanel = new JPanel();
 		centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
 		centerPanel.add(canvas);
-		centerPanel.add(nameLabel);
 		JPanel leftPanel = new JPanel();
 		leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.X_AXIS));
 
@@ -285,7 +289,16 @@ public class ScatterPlotView extends Widget {
         }
 
         gui.applyTheme(themeManager);
+        toolTipBox.setAutoSize(true);
+        toolTipBox.setTheme("label");
+        xAxisLabel.setTheme("bigLabel");
+        yAxisLabel.setTheme("bigLabel");
+        zAxisLabel.setTheme("bigLabel");
+
 		add(toolTipBox);
+		add(xAxisLabel);
+		add(yAxisLabel);
+		add(zAxisLabel);
         toolTipBox.setSize(100, 30);
 		init();
 		makeLandscape();
@@ -303,7 +316,6 @@ public class ScatterPlotView extends Widget {
 		}
 		//Display.destroy();
 
-		tesselator.gluDeleteTess();
 		frame.dispose();
 		System.exit(0);
 	}
@@ -313,47 +325,9 @@ public class ScatterPlotView extends Widget {
 	private void init(){
 		selectBuff = BufferUtils.createIntBuffer(1024);
 		GL11.glSelectBuffer(selectBuff);
-/*		FloatBuffer mat_specular = BufferUtils.createFloatBuffer(4);
-		mat_specular.put(1);
-		mat_specular.put(0);
-		mat_specular.put(0);
-		mat_specular.put(1);
-		mat_specular.rewind();
 
-		FloatBuffer light_position = BufferUtils.createFloatBuffer(4);
-		light_position.put(1);
-		light_position.put(1);
-		light_position.put(1);
-		light_position.put(1);
-		light_position.rewind();
-
-		float mat_shininess = 70;
-
-		FloatBuffer white_light = BufferUtils.createFloatBuffer(4);
-		white_light.put(1);
-		white_light.put(1);
-		white_light.put(1);
-		white_light.put(1);
-		white_light.rewind();
-
-		FloatBuffer wlmodel_ambient = BufferUtils.createFloatBuffer(4);
-		wlmodel_ambient.put(0.1f);
-		wlmodel_ambient.put(0.1f);
-		wlmodel_ambient.put(0.1f);
-		wlmodel_ambient.put(0.1f);
-		wlmodel_ambient.rewind();*/
 		GL11.glClearColor(1, 1, 1, 1);
-/*		GL11.glShadeModel(GL11.GL_SMOOTH);
-		GL11.glMaterial(GL11.GL_FRONT, GL11.GL_SPECULAR, mat_specular);
-		GL11.glMaterial(GL11.GL_FRONT, GL11.GL_AMBIENT, mat_specular);
-		GL11.glMaterial(GL11.GL_FRONT, GL11.GL_DIFFUSE, mat_specular);
-		GL11.glMaterialf(GL11.GL_FRONT, GL11.GL_SHININESS, mat_shininess);
-		GL11.glLight(GL11.GL_LIGHT0, GL11.GL_POSITION, light_position);
-		GL11.glLight(GL11.GL_LIGHT0, GL11.GL_DIFFUSE, white_light);
-		GL11.glLight(GL11.GL_LIGHT0, GL11.GL_AMBIENT, wlmodel_ambient);*/
 
-/*		GL11.glEnable(GL11.GL_LIGHTING);
-		GL11.glEnable(GL11.GL_LIGHT0);*/
 		GL11.glEnable(GL11.GL_DEPTH_TEST);
 		GL11.glEnable(GL11.GL_NORMALIZE);
 		GL11.glEnable(GL11.GL_COLOR_MATERIAL);
@@ -362,7 +336,6 @@ public class ScatterPlotView extends Widget {
 		GL11.glEnable(GL11.GL_BLEND);
 		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 		makeColorPalette();
-		//tessellate();
 	}
 	private void makeColorPalette() {
 		colorPalette = new Vector<Color>();
@@ -393,9 +366,7 @@ public class ScatterPlotView extends Widget {
 			else{
 				overedIndex = choose;
 			}
-			nameLabel.setAlignmentX(0);
-			DecimalFormat format  = new DecimalFormat(".##");
-			toolTipBox.setText(data.name);
+			toolTipBox.setText(data.name+" ("+data.x+", "+data.y+")");
 		}
 		else{
 			overedIndex = -1;
@@ -440,34 +411,16 @@ public class ScatterPlotView extends Widget {
 		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT|GL11.GL_DEPTH_BUFFER_BIT);
 
 
-		showName();
-		drawShadows();
 		drawDots();
-		drawAxis(maxXY);
+		if(renderMode != GL11.GL_SELECT){
+			drawShadows();
+			drawAxis(maxXY);
+
+		}
 
 
 	}
-	private void showName(){
-		if(overedIndex!=-1){
-			ExpressionData data = dataTable.get(overedIndex);
-			nameLabel.setText(data.name + " ("+ data.getX() + "," + data.getY() + ")");
-		}
-		else{
-			nameLabel.setText(" ");
-		}
-	}
-	private void drawLandscape(){
-		GL11.glBegin(GL11.GL_POINTS);
-		GL11.glColor3f(0, 0, 0);
-		for(int i = 0; i < landscape.length-1; i++){
-			for(int j = 0 ; j< landscape[i].length-1; j++){
 
-				GL11.glVertex3d(i*lod, j*lod, landscape[i][j]);
-				GL11.glVertex3d(i*lod, (j+1)*lod, landscape[i][j+1]);
-			}
-		}
-		GL11.glEnd();
-	}
 
 	private void drawDots() {
 		GL11.glInitNames();
@@ -478,7 +431,7 @@ public class ScatterPlotView extends Widget {
 			GL11.glPushName(i);
 			GL11.glBegin(GL11.GL_POINTS);
 
-			if(overedIndex == i){
+			if(overedIndex == i||clickedIndex == i){
 				GL11.glColor3f(0, 1, 1);
 			}
 			else{
@@ -521,8 +474,107 @@ public class ScatterPlotView extends Widget {
 			GL11.glVertex3d(i, 0, maxXY);
 		}
 		GL11.glEnd();
+
+
+		Vector<Float[]> intersect = new Vector<Float[]>();
+		float origin[] = new float[3];
+		Vector<float[]> axes = new Vector<float[]>();
+
+		IntBuffer viewport = BufferUtils.createIntBuffer(16);
+		GL11.glGetInteger(GL11.GL_VIEWPORT, viewport);
+
+		FloatBuffer modelMatrix = BufferUtils.createFloatBuffer(16);
+		GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, modelMatrix);
+
+		FloatBuffer projMatrix = BufferUtils.createFloatBuffer(16);
+		GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, projMatrix);
+		FloatBuffer win_pos = BufferUtils.createFloatBuffer(16);
+
+		GLU.gluProject(0, 0, 0, modelMatrix, projMatrix, viewport, win_pos);
+
+		origin[0] = win_pos.get(0);
+		origin[1] = win_pos.get(1);
+
+		GLU.gluProject(100, 0, 0, modelMatrix, projMatrix, viewport, win_pos);
+		float t_x[] = {win_pos.get(0), win_pos.get(1)};;
+		axes.add(t_x);
+
+		GLU.gluProject(0, 100, 0, modelMatrix, projMatrix, viewport, win_pos);
+		float t_y[] = {win_pos.get(0), win_pos.get(1)};;
+		axes.add(t_y);
+
+		GLU.gluProject(0, 0, 100, modelMatrix, projMatrix, viewport, win_pos);
+		float t_z[] = {win_pos.get(0), win_pos.get(1)};;
+		axes.add(t_z);
+
+
+
+		for(int i = 0; i < 3; i++){
+			float[] axisSample = axes.get(i);
+			float intersectX0 = (axisSample[0] - origin[0])/(axisSample[1] - origin[1])*(0-origin[1])+origin[0]; // intersection point with bottom boundary
+			Float[] a = {intersectX0, 0f};
+			intersect.add(a);
+			Float intersectX1 = (axisSample[0] - origin[0])/(axisSample[1] - origin[1])*(viewport.get(3)-origin[1])+origin[0];// intersection point with top boundary
+			Float[] b= {intersectX1, (float)viewport.get(3)};
+			intersect.add(b);
+			Float intersectY0 = (axisSample[1] - origin[1])/(axisSample[0] - origin[0])*(0-origin[0])+origin[1];// intersection point with left boundary
+			Float[] c= {0f, intersectY0};
+			intersect.add(c);
+			Float intersectY1 = (axisSample[1] - origin[1])/(axisSample[0] - origin[0])*(viewport.get(2)-origin[0])+origin[1];// intersection point with right boundary
+			Float[] d= {(float)viewport.get(2), intersectY1};
+			intersect.add(d);
+
+			for(Float[] intersectPoint: intersect){
+
+				if(intersectPoint[0] < 0 || intersectPoint[0] > viewport.get(2)
+						|| intersectPoint[1] < 0 || intersectPoint[1] > viewport.get(3)
+						|| (axisSample[0]-origin[0]) * (intersectPoint[0] - origin[0]) < 0
+						|| (axisSample[1]-origin[1]) * (intersectPoint[1] - origin[1]) < 0 ){
+				}
+				else{
+
+					if(intersectPoint[0]==0){
+						intersectPoint[0] += 10;
+					}
+					else if(intersectPoint[0]==viewport.get(2)){
+						intersectPoint[0] -= 10;
+					}
+					if(intersectPoint[1]==0){
+						intersectPoint[1] += 10;
+					}
+					else if(intersectPoint[1]==viewport.get(3)){
+						intersectPoint[1] -= 10;
+					}
+					int xPos = intersectPoint[0].intValue();
+					int yPos = viewport.get(3) - intersectPoint[1].intValue();
+					//check is in viewport
+					Label axisLabel = xAxisLabel;
+					switch(i){
+						case 0:
+							axisLabel = xAxisLabel;
+							GLU.gluProject((float) maxXY, 0, 0, modelMatrix, projMatrix, viewport, win_pos);
+							break;
+						case 1:
+							axisLabel = yAxisLabel;
+							GLU.gluProject(0, (float) maxXY, 0, modelMatrix, projMatrix, viewport, win_pos);
+							break;
+						case 2:
+							axisLabel = zAxisLabel;
+							GLU.gluProject(0, 0, (float) maxXY, modelMatrix, projMatrix, viewport, win_pos);
+							break;
+					}
+					if(win_pos.get(0) > 0 && win_pos.get(0) < viewport.get(2) && win_pos.get(1) > 0 && win_pos.get(1) < viewport.get(3)){
+						xPos = (int) win_pos.get(0);
+						yPos = viewport.get(3) - (int) win_pos.get(1);
+					}
+					axisLabel.setPosition(xPos, yPos);
+
+
+				}
+			}
+		}
 	}
-	private void tessellate(){
+	/*private void tessellate(){
 
 		tessList = GL11.glGenLists(2);
 		tesselator = gluNewTess();
@@ -551,5 +603,5 @@ public class ScatterPlotView extends Widget {
 			tesselator.gluTessEndPolygon();
 		GL11.glEndList();
 
-	}
+	}*/
 }

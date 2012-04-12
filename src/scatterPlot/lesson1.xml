@@ -17,6 +17,7 @@
             <alias ref="-frameB"/>
         </select>
     </images>
+    <fontDef name="big" filename="big.fnt" color="#000000"/>
 
     <fontDef name="normal" filename="font.fnt" color="black">
         <fontParam if="error" color="red"/>
@@ -44,8 +45,12 @@
     </theme>
 
     <theme name="scatterplotview" ref="-defaults">
-        <theme name="button" ref="-defaults">
-            <param name=""><image>button.*</image></param>
+        <theme name="label" ref="-defaults">
+            <param name=""><image>label.*</image></param>
+            <param name="font"><font>normal</font></param>
+        </theme>
+        <theme name="bigLabel" ref="-defaults">
+            <param name="font"><font>big</font></param>
         </theme>
     </theme>
 </themes>
