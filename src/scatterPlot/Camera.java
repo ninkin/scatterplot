@@ -6,8 +6,8 @@ import org.lwjgl.opengl.GL11;
 
 public class Camera {
 
-    private static final float MOUSE_SENSITIVITY = 0.5f;
-    private static final float KEY_SENSITIVITY = 1000f;
+    private static final float MOUSE_SENSITIVITY = 1f;
+    private static final float KEY_SENSITIVITY = 10000f;
 
     // Angle coordinates of the camera
     private float xAngle = 0f;
@@ -18,6 +18,7 @@ public class Camera {
     private float yPos = 0f;
     private float zPos = 0f;
 
+    public float zoomLevel = 1;
     private float zoomInFactor = 0.75f;
     private float zoomOutFactor = 1.33f;
 
@@ -36,9 +37,10 @@ public class Camera {
     private float yleftPrevious = 0.0f;
     private float yleftDiff = 0.0f;
 
-    
-    
-    
+
+    public boolean rotateToOrigin = true;
+
+
     //setting viewing volumne
     private double left_plane;
     private double right_plane;
@@ -136,17 +138,11 @@ public class Camera {
         int wheelMovement = Mouse.getDWheel();
         // If scrolled up
         if (wheelMovement > 0){
-        	this.bottom_plane *= zoomInFactor;
-        	this.top_plane *= zoomInFactor;
-        	this.left_plane *= zoomInFactor;
-        	this.right_plane *= zoomInFactor;
+        	zoomLevel *= zoomInFactor;
         }
         // If scrolled down
         if (wheelMovement < 0){
-        	this.bottom_plane *= zoomOutFactor;
-        	this.top_plane *= zoomOutFactor;
-        	this.left_plane *= zoomOutFactor;
-        	this.right_plane *= zoomOutFactor;
+        	zoomLevel *= zoomOutFactor;
         }
 
     }
@@ -154,22 +150,42 @@ public class Camera {
 
         // If direction buttons are pressed
         if (Keyboard.isKeyDown(Keyboard.KEY_W)) {
-            xPos += (float)(Math.sin(Math.toRadians(xAngle))*KEY_SENSITIVITY);
-            yPos += (float)(Math.cos(Math.toRadians(xAngle))*KEY_SENSITIVITY);
-            zPos += (float)(Math.signum(Math.cos(Math.toRadians(yAngle)))*KEY_SENSITIVITY);
+        	if(rotateToOrigin){
+        		yPos += KEY_SENSITIVITY * zoomLevel;
+        	}
+        	else{
+	            xPos += (float)(Math.sin(Math.toRadians(xAngle))*KEY_SENSITIVITY*zoomLevel);
+	            yPos += (float)(Math.cos(Math.toRadians(xAngle))*KEY_SENSITIVITY*zoomLevel);
+	            zPos -= (float)(Math.sin(Math.toRadians(yAngle))*KEY_SENSITIVITY*zoomLevel);
+        	}
         }
         if (Keyboard.isKeyDown(Keyboard.KEY_S)) {
-            xPos -= (float)(Math.sin(Math.toRadians(xAngle))*KEY_SENSITIVITY);
-            yPos -= (float)(Math.cos(Math.toRadians(xAngle))*KEY_SENSITIVITY);
-            zPos -= (float)(Math.signum(Math.cos(Math.toRadians(yAngle)))*KEY_SENSITIVITY);
+        	if(rotateToOrigin){
+        		yPos -= KEY_SENSITIVITY * zoomLevel;
+        	}
+        	else{
+	            xPos -= (float)(Math.sin(Math.toRadians(xAngle))*KEY_SENSITIVITY*zoomLevel);
+	            yPos -= (float)(Math.cos(Math.toRadians(xAngle))*KEY_SENSITIVITY*zoomLevel);
+	            zPos += (float)(Math.sin(Math.toRadians(yAngle))*KEY_SENSITIVITY*zoomLevel);
+        	}
         }
         if (Keyboard.isKeyDown(Keyboard.KEY_D)) {
-            xPos += (float)(Math.sin(Math.toRadians(90.0f-xAngle))*KEY_SENSITIVITY);
-            yPos -= (float)(Math.cos(Math.toRadians(90.0f-xAngle))*KEY_SENSITIVITY);
+        	if(rotateToOrigin){
+        		xPos += KEY_SENSITIVITY * zoomLevel;
+        	}
+        	else{
+	            xPos += (float)(Math.sin(Math.toRadians(90.0f-xAngle))*KEY_SENSITIVITY*zoomLevel);
+	            yPos -= (float)(Math.cos(Math.toRadians(90.0f-xAngle))*KEY_SENSITIVITY*zoomLevel);
+        	}
         }
         if (Keyboard.isKeyDown(Keyboard.KEY_A)) {
-            xPos -= (float)(Math.sin(Math.toRadians(90.0f-xAngle))*KEY_SENSITIVITY);
-            yPos += (float)(Math.cos(Math.toRadians(90.0f-xAngle))*KEY_SENSITIVITY);
+        	if(rotateToOrigin){
+        		xPos -= KEY_SENSITIVITY * zoomLevel;
+        	}
+        	else{
+	            xPos -= (float)(Math.sin(Math.toRadians(90.0f-xAngle))*KEY_SENSITIVITY*zoomLevel);
+	            yPos += (float)(Math.cos(Math.toRadians(90.0f-xAngle))*KEY_SENSITIVITY*zoomLevel);
+        	}
         }
 
     }
@@ -208,7 +224,7 @@ public class Camera {
         moveFree();
     }
     private void zoom(){
-    	GL11.glOrtho(left_plane, right_plane, bottom_plane, top_plane, near_plane, far_plane);
+    	GL11.glOrtho(left_plane * zoomLevel, right_plane * zoomLevel, bottom_plane * zoomLevel, top_plane * zoomLevel, near_plane, far_plane);
     }
     /**
 	 * Move the camera in free mode
@@ -216,12 +232,18 @@ public class Camera {
     private void moveFree(){
     	GL11.glMatrixMode(GL11.GL_MODELVIEW);
 		GL11.glLoadIdentity();
-		zPos = Math.min(0, zPos);
 
         // Check for room boundaries
 
-        GL11.glRotatef(-yAngle, 1.0f, 0.0f, 0.0f);
-        GL11.glRotatef(xAngle, 0.0f, 0.0f, 1.0f);
-        GL11.glTranslatef(-xPos, -yPos, zPos);
+		if(rotateToOrigin){
+	        GL11.glTranslatef(-xPos, -yPos, zPos);
+	        GL11.glRotatef(-yAngle, 1.0f, 0.0f, 0.0f);
+	        GL11.glRotatef(xAngle, 0.0f, 0.0f, 1.0f);
+		}
+		else{
+	        GL11.glRotatef(-yAngle, 1.0f, 0.0f, 0.0f);
+	        GL11.glRotatef(xAngle, 0.0f, 0.0f, 1.0f);
+	        GL11.glTranslatef(-xPos, -yPos, zPos);
+		}
     }
 }

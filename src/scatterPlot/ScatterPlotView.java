@@ -25,6 +25,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.text.DecimalFormat;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
@@ -87,7 +88,8 @@ public class ScatterPlotView extends Widget {
 	//to picking
 	IntBuffer selectBuff;
 	int renderMode = GL11.GL_RENDER;
-	int selectedIndex=-1;
+	int clickedIndex =-1;
+	int overedIndex =-1;
 
 	//to tesselate
 	int tessList;
@@ -135,7 +137,7 @@ public class ScatterPlotView extends Widget {
 
 	public void start() {
 		maxXY = Math.max(spModel.getMaxX(), spModel.getMaxY());
-		camera = new Camera(-maxXY, maxXY, -maxXY, maxXY, -2*maxXY, 2*maxXY);
+		camera = new Camera(-2*maxXY, 2*maxXY, -2*maxXY, 2*maxXY, -2*maxXY, 2*maxXY);
 
 /*		Vector<Vector<Object>> tempTable = new Vector<Vector<Object>>();
 		for(ExpressionData e : dataTable){
@@ -375,27 +377,41 @@ public class ScatterPlotView extends Widget {
 		renderMode = GL11.GL_RENDER;
 		int hits = GL11.glRenderMode(GL11.GL_RENDER);
 		if(hits > 0){
-			ExpressionData data = dataTable.get(selectBuff.get(3));
+			int depth, choose;
+			choose = selectBuff.get(3);
+			depth = selectBuff.get(1);
+			for(int loop = 1; loop < hits ; loop++){
+				if(selectBuff.get(loop*4+1) < depth){
+					choose = selectBuff.get(loop*4+3);
+					depth = selectBuff.get(loop*4+1);
+				}
+			}
+			ExpressionData data = dataTable.get(choose);
 			if(Mouse.isButtonDown(0)){
-				selectedIndex = selectBuff.get(3);
+				clickedIndex = overedIndex;
+			}
+			else{
+				overedIndex = choose;
 			}
 			nameLabel.setAlignmentX(0);
+			DecimalFormat format  = new DecimalFormat(".##");
 			toolTipBox.setText(data.name);
 		}
-		else if(Mouse.isButtonDown(0)&&selectedIndex != -1){
-			selectedIndex = -1;
-		}
 		else{
+			overedIndex = -1;
 			toolTipBox.setText(null);
+			if(Mouse.isButtonDown(0)&&clickedIndex != -1){
+				clickedIndex = -1;
+			}
 		}
 	}
 
 
 
 	private void drawShadows() {
-		if(selectedIndex != -1){
-			ExpressionData e = dataTable.get(selectedIndex);
-			GL11.glColor3f(0, 0, 0);
+		if(clickedIndex != -1){
+			ExpressionData e = dataTable.get(clickedIndex);
+			GL11.glColor3d(0.8, 0.8, 0.8);
 			GL11.glBegin(GL11.GL_LINES);
 			GL11.glVertex3d(e.x, e.y, e.z);
 			GL11.glVertex3d(0, e.y, e.z);
@@ -415,13 +431,14 @@ public class ScatterPlotView extends Widget {
 		if(renderMode == GL11.GL_SELECT){
 			IntBuffer viewport = BufferUtils.createIntBuffer(16);
 			GL11.glGetInteger(GL11.GL_VIEWPORT, viewport);
-			GLU.gluPickMatrix(Mouse.getX(), Mouse.getY(), 2, 2, viewport);
+			GLU.gluPickMatrix(Mouse.getX(), Mouse.getY(), 3, 3, viewport);
 		}
 		double maxXY = Math.max(spModel.getMaxX(), spModel.getMaxY());
 		camera.getInput();
 		camera.move();
 
 		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT|GL11.GL_DEPTH_BUFFER_BIT);
+
 
 		showName();
 		drawShadows();
@@ -431,8 +448,8 @@ public class ScatterPlotView extends Widget {
 
 	}
 	private void showName(){
-		if(selectedIndex!=-1){
-			ExpressionData data = dataTable.get(selectedIndex);
+		if(overedIndex!=-1){
+			ExpressionData data = dataTable.get(overedIndex);
 			nameLabel.setText(data.name + " ("+ data.getX() + "," + data.getY() + ")");
 		}
 		else{
@@ -461,16 +478,23 @@ public class ScatterPlotView extends Widget {
 			GL11.glPushName(i);
 			GL11.glBegin(GL11.GL_POINTS);
 
-			GL11.glColor4d(
-					(colorPalette.get(0).getRed()*(1-(double)i/dataTable.size())+colorPalette.get(1).getRed()*((double)i/dataTable.size()))/255.0,
-					(colorPalette.get(0).getGreen()*(1-(double)i/dataTable.size())+colorPalette.get(1).getGreen()*((double)i/dataTable.size()))/255.0,
-					(colorPalette.get(0).getBlue()*(1-(double)i/dataTable.size())+colorPalette.get(1).getBlue()*((double)i/dataTable.size()))/255.0,
-					0.5);
+			if(overedIndex == i){
+				GL11.glColor3f(0, 1, 1);
+			}
+			else{
+				GL11.glColor4d(
+						(colorPalette.get(0).getRed()*(1-(double)i/dataTable.size())+colorPalette.get(1).getRed()*((double)i/dataTable.size()))/255.0,
+						(colorPalette.get(0).getGreen()*(1-(double)i/dataTable.size())+colorPalette.get(1).getGreen()*((double)i/dataTable.size()))/255.0,
+						(colorPalette.get(0).getBlue()*(1-(double)i/dataTable.size())+colorPalette.get(1).getBlue()*((double)i/dataTable.size()))/255.0,
+						0.5);
+
+			}
 
 			GL11.glVertex3d(item.x, item.y, item.z);
 			GL11.glEnd();
 			GL11.glPopName();
 		}
+
 	}
 
 	private void drawAxis(double maxXY) {
@@ -478,9 +502,6 @@ public class ScatterPlotView extends Widget {
 		GL11.glLineWidth(1);
 		GL11.glBegin(GL11.GL_LINES);
 
-
-
-		// xy
 		for(int i = 0; i < maxXY; i+= stride ){
 			if(i ==0 )
 				GL11.glColor3f(0, 0, 0);
@@ -499,8 +520,6 @@ public class ScatterPlotView extends Widget {
 			GL11.glVertex3d(i, 0, 0);
 			GL11.glVertex3d(i, 0, maxXY);
 		}
-
-
 		GL11.glEnd();
 	}
 	private void tessellate(){

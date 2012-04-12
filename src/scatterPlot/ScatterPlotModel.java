@@ -59,7 +59,7 @@ public class ScatterPlotModel {
 			stat.execute("ATTACH DATABASE \"Sample02.clt\" AS Sample02");
 			ResultSet rs = stat.executeQuery("SELECT a.Feature_ID, a.RPKM as RPKM1, b.RPKM as RPKM2, a.Expression_Values, a.Gene_length," +
 					" a.Unique_gene_reads, a.Total_gene_reads, a.Chromosome, a.Chromosome_region_start," +
-					" a.Chromosome_region_end FROM main.RPKM a INNER JOIN Sample02.RPKM b ON a.ROWID = b.ROWID");
+					" a.Chromosome_region_end FROM main.RPKM a INNER JOIN Sample02.RPKM b ON a.ROWID = b.ROWID LIMIT 1000");
 			do{
 				String name = rs.getString(1);
 				double x = rs.getDouble(2);
