@@ -3,30 +3,16 @@ import java.awt.BorderLayout;
 import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics2D;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.awt.geom.AffineTransform;
-import java.awt.image.AffineTransformOp;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.text.DecimalFormat;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
@@ -34,41 +20,25 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JRadioButton;
-import javax.swing.JSlider;
 import javax.swing.JTable;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
-import javax.swing.plaf.SliderUI;
-import javax.swing.plaf.basic.BasicSliderUI;
-import javax.tools.Tool;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
-import org.lwjgl.Sys;
-import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL12;
-import org.lwjgl.opengl.GL20;
 import org.lwjgl.util.glu.GLU;
-import org.lwjgl.util.glu.GLUtessellator;
 
-import de.matthiasmann.twl.Button;
 import de.matthiasmann.twl.GUI;
 import de.matthiasmann.twl.Label;
-import de.matthiasmann.twl.TextArea;
 import de.matthiasmann.twl.Widget;
 import de.matthiasmann.twl.renderer.lwjgl.LWJGLRenderer;
 import de.matthiasmann.twl.theme.ThemeManager;
-import static org.lwjgl.util.glu.GLU.*;
-
+import delaunay_triangulation.Delaunay_Triangulation;
+import delaunay_triangulation.Point_dt;
+import delaunay_triangulation.Triangle_dt;
 public class ScatterPlotView extends Widget {
-
-
 	Vector<Color> colorPalette;
 	// UI initialize
 	private final static AtomicReference<Dimension> newCanvasSize = new AtomicReference<Dimension>();
@@ -86,6 +56,8 @@ public class ScatterPlotView extends Widget {
 	double [][]landscape;
 	double maxXY;
 	int lod = 100;
+	Delaunay_Triangulation DT;
+
 
 	//to picking
 	IntBuffer selectBuff;
@@ -93,19 +65,26 @@ public class ScatterPlotView extends Widget {
 	int clickedIndex =-1;
 	int overedIndex =-1;
 
-	//to tesselate
-	int tessList;
-	//private GLUtessellator tesselator;
 	ThemeManager themeManager;
 
 	//to print text
 	Label toolTipBox = new Label();
 
 
+	//layouts
+	JFrame frame = new JFrame();
+	final Canvas canvas = new Canvas();
+
 	//axis
 	Label xAxisLabel = new Label("X");
 	Label yAxisLabel = new Label("Y");
 	Label zAxisLabel = new Label("Z");
+
+	//Buttons
+	JButton xyButton = new JButton();
+	JButton yzButton = new JButton();
+	JButton xzButton = new JButton();
+
 
 	public ScatterPlotView(List<ExpressionData> dataTable){
 		this.dataTable = dataTable;
@@ -118,60 +97,73 @@ public class ScatterPlotView extends Widget {
 
 		spView.start();
 	}
-	private void makeLandscape(){
-		Vector<Vector<Vector<Double>>> tempZsumVector =  new  Vector<Vector<Vector< Double >>> (); ;
-
-		landscape = new double [(int) (maxXY/lod)+1][(int) (maxXY/lod)+1];
-		for(int i = 0; i < maxXY/lod; i++){
-			tempZsumVector.add(new Vector<Vector<Double>>());
-			for(int j = 0; j < maxXY/lod; j++){
-				tempZsumVector.get(i).add(new Vector<Double>());
-			}
-		}
-		for(ExpressionData e : dataTable){
-			tempZsumVector.get((int)e.x/lod).get((int)e.y/lod).add(e.z);
-		}
-		for(int i = 0; i < tempZsumVector.size(); i++){
-			for(int j = 0; j < tempZsumVector.get(i).size(); j++){
-				double zSum=0;
-				for(Double g : tempZsumVector.get(i).get(j)){
-					zSum += g.doubleValue();
-				}
-				landscape[i][j] = zSum/tempZsumVector.get(i).get(j).size();
-			}
-		}
-	}
 
 	public void start() {
 		maxXY = Math.max(spModel.getMaxX(), spModel.getMaxY());
 		camera = new Camera(-2*maxXY, 2*maxXY, -2*maxXY, 2*maxXY, -2*maxXY, 2*maxXY);
-
-/*		Vector<Vector<Object>> tempTable = new Vector<Vector<Object>>();
-		for(ExpressionData e : dataTable){
-			Vector<Object> newData = new Vector<Object>();
-			newData.add(e.x);
-			newData.add(e.y);
-			newData.add(e.z);
-			for(Object data : e.getData()){
-				newData.add(data);
-			}
+		initLayout();
+		try {
+			canvas.setVisible(true);
+			frame.setVisible(true);
+			Display.setParent(canvas);
+			Display.setVSyncEnabled(true);
+			frame.setPreferredSize(new Dimension(1024, 800));
+			frame.setMinimumSize(new Dimension(800, 600));
+			frame.pack();
+			Display.create();
+		} catch (LWJGLException e) {
+			e.printStackTrace();
+			System.exit(0);
 		}
-		Vector<String> columnName = new Vector<String>();
-		columnName.add("x");
-		columnName.add("y");
-		columnName.add("z");
-		columnName.add("Expression Value");
-		columnName.add("Gene Length");
-		columnName.add("Unique_gene_reads");
-		columnName.add("Chromosome");
-		columnName.add("Chromosome_region_start");
-		columnName.add("Chromosome_region_end");*/
+		GUI gui = initTWL();
+		initOpenGL();
+		makeColorPalette();
+		initTerrain();
+		while (!Display.isCloseRequested() && ! closeRequested){
+			display();
+			mouseClickHandler(Mouse.getX(), Mouse.getY());
+			if(toolTipBox.getText()==null)
+				toolTipBox.setVisible(false);
+			else
+				toolTipBox.setVisible(true);
+			toolTipBox.setPosition(Mouse.getX()+20, canvas.getHeight() - Mouse.getY()+10);
+			gui.update();
+			Display.update();
+		}
+		Display.destroy();
+		frame.dispose();
 
+		System.exit(0);
+	}
 
-		//detailTable = new JTable(tempTable, columnName );
-		//detailTable.setPreferredSize(new Dimension(200,500));
+	private GUI initTWL() {
+		LWJGLRenderer renderer;
+		try {
+			renderer = new LWJGLRenderer();
+			GUI gui = new GUI(this, renderer);
+            themeManager = ThemeManager.createThemeManager(getClass().getResource("lesson1.xml"), renderer);
+            gui.applyTheme(themeManager);
+            toolTipBox.setAutoSize(true);
+            toolTipBox.setTheme("label");
+            xAxisLabel.setTheme("bigLabel");
+            yAxisLabel.setTheme("bigLabel");
+            zAxisLabel.setTheme("bigLabel");
 
-		JButton xyButton = new JButton();
+    		add(toolTipBox);
+    		add(xAxisLabel);
+    		add(yAxisLabel);
+    		add(zAxisLabel);
+    		return gui;
+		} catch (LWJGLException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return null;
+	}
+	private void initLayout() {
 		xyButton.setText("XY");
 		xyButton.addMouseListener(new MouseAdapter() {
 			@Override
@@ -182,7 +174,6 @@ public class ScatterPlotView extends Widget {
 			}
 		});
 
-		JButton yzButton = new JButton();
 		yzButton.setText("YZ");
 		yzButton.addMouseListener(new MouseAdapter() {
 			@Override
@@ -193,7 +184,7 @@ public class ScatterPlotView extends Widget {
 			}
 		});
 
-		JButton xzButton = new JButton();
+
 		xzButton.setText("XZ");
 		xzButton.addMouseListener(new MouseAdapter() {
 			@Override
@@ -205,18 +196,11 @@ public class ScatterPlotView extends Widget {
 		});
 
 
-		JFrame frame = new JFrame();
+
 		frame.setLayout(new BorderLayout());
 
 
-		final Canvas canvas = new Canvas();
 		canvas.setSize(new Dimension(1000,700));
-
-
-
-
-
-
 
 		canvas.addComponentListener(new ComponentAdapter() {
 			@Override
@@ -248,81 +232,11 @@ public class ScatterPlotView extends Widget {
 		rightPanel.add(yzButton);
 		rightPanel.add(xzButton);
 
-
 		frame.add(centerPanel, BorderLayout.CENTER);
 		frame.add(leftPanel, BorderLayout.WEST);
 		frame.add(rightPanel, BorderLayout.EAST);
-
-		try {
-
-			canvas.setVisible(true);
-			frame.setVisible(true);
-			Display.setParent(canvas);
-
-			Display.setVSyncEnabled(true);
-
-
-			frame.setPreferredSize(new Dimension(1024, 800));
-			frame.setMinimumSize(new Dimension(800, 600));
-			frame.pack();
-			Display.create();
-
-
-		} catch (LWJGLException e) {
-			e.printStackTrace();
-			System.exit(0);
-		}
-		LWJGLRenderer renderer = null;
-
-		try {
-			renderer = new LWJGLRenderer();
-		} catch (LWJGLException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-
-		GUI gui = new GUI(this, renderer);
-		 try{
-             themeManager = ThemeManager.createThemeManager(getClass().getResource("lesson1.xml"), renderer);
-        } catch(IOException e){
-            e.printStackTrace();
-        }
-
-        gui.applyTheme(themeManager);
-        toolTipBox.setAutoSize(true);
-        toolTipBox.setTheme("label");
-        xAxisLabel.setTheme("bigLabel");
-        yAxisLabel.setTheme("bigLabel");
-        zAxisLabel.setTheme("bigLabel");
-
-		add(toolTipBox);
-		add(xAxisLabel);
-		add(yAxisLabel);
-		add(zAxisLabel);
-        toolTipBox.setSize(100, 30);
-		init();
-		makeLandscape();
-		while (!Display.isCloseRequested() && ! closeRequested){
-
-			display();
-			mouseClickHandler(Mouse.getX(), Mouse.getY());
-			if(toolTipBox.getText()==null)
-				toolTipBox.setVisible(false);
-			else
-				toolTipBox.setVisible(true);
-			toolTipBox.setPosition(Mouse.getX()+20, canvas.getHeight() - Mouse.getY()+10);
-			gui.update();
-			Display.update();
-		}
-		//Display.destroy();
-
-		frame.dispose();
-		System.exit(0);
 	}
-
-
-
-	private void init(){
+	private void initOpenGL() {
 		selectBuff = BufferUtils.createIntBuffer(1024);
 		GL11.glSelectBuffer(selectBuff);
 
@@ -335,7 +249,6 @@ public class ScatterPlotView extends Widget {
 		GL11.glEnable(GL11.GL_POINT_SMOOTH);
 		GL11.glEnable(GL11.GL_BLEND);
 		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-		makeColorPalette();
 	}
 	private void makeColorPalette() {
 		colorPalette = new Vector<Color>();
@@ -382,14 +295,35 @@ public class ScatterPlotView extends Widget {
 	private void drawShadows() {
 		if(clickedIndex != -1){
 			ExpressionData e = dataTable.get(clickedIndex);
-			GL11.glColor3d(0.8, 0.8, 0.8);
+			GL11.glColor3d(0, 0, 0);
 			GL11.glBegin(GL11.GL_LINES);
+
 			GL11.glVertex3d(e.x, e.y, e.z);
 			GL11.glVertex3d(0, e.y, e.z);
+
+			GL11.glVertex3d(0, e.y, e.z);
+			GL11.glVertex3d(0, 0, e.z);
+
+			GL11.glVertex3d(0, e.y, e.z);
+			GL11.glVertex3d(0, e.y, 0);
+
 			GL11.glVertex3d(e.x, e.y, e.z);
 			GL11.glVertex3d(e.x, e.y, 0);
+
+			GL11.glVertex3d(e.x, e.y, 0);
+			GL11.glVertex3d(0, e.y, 0);
+
+			GL11.glVertex3d(e.x, e.y, 0);
+			GL11.glVertex3d(e.x, 0, 0);
+
 			GL11.glVertex3d(e.x, e.y, e.z);
 			GL11.glVertex3d(e.x, 0, e.z);
+
+			GL11.glVertex3d(e.x, 0, e.z);
+			GL11.glVertex3d(e.x, 0, 0);
+
+			GL11.glVertex3d(e.x, 0, e.z);
+			GL11.glVertex3d(0, 0, e.z);
 			GL11.glEnd();
 
 		}
@@ -415,7 +349,7 @@ public class ScatterPlotView extends Widget {
 		if(renderMode != GL11.GL_SELECT){
 			drawShadows();
 			drawAxis(maxXY);
-
+			drawTerrain();
 		}
 
 
@@ -574,34 +508,32 @@ public class ScatterPlotView extends Widget {
 			}
 		}
 	}
-	/*private void tessellate(){
+	private void initTerrain(){
+		Point_dt[] ps = new Point_dt[dataTable.size()];
+		for(int i = 0; i < dataTable.size(); i++){
+			ps[i] = new Point_dt(dataTable.get(i).x, dataTable.get(i).y, dataTable.get(i).z);
+		}
+		DT = new Delaunay_Triangulation(ps);
+	}
+	private void drawTerrain(){
 
-		tessList = GL11.glGenLists(2);
-		tesselator = gluNewTess();
-		TessCallback callback = new TessCallback();
-		tesselator.gluTessCallback(GLU_TESS_VERTEX, callback);
-		tesselator.gluTessCallback(GLU_TESS_BEGIN, callback);
-		tesselator.gluTessCallback(GLU_TESS_END, callback);
-		tesselator.gluTessCallback(GLU_TESS_COMBINE, callback);
+		Iterator<Triangle_dt> iter = DT.trianglesIterator();
+		GL11.glColor3d(0.8, 0.8, 0.8);
+		while(iter.hasNext()){
 
-		tesselator.gluTessProperty(GLU_TESS_WINDING_RULE, GLU_TESS_WINDING_NONZERO);
-		tesselator.gluTessProperty(GLU_TESS_BOUNDARY_ONLY,GL11.GL_TRUE);
-		tesselator.gluTessNormal(0, 0, 1);
-
-		GL11.glNewList(tessList, GL11.GL_COMPILE);
-			tesselator.gluTessBeginPolygon(null);
-			tesselator.gluTessBeginContour();
-			int i=0;
-			for(ExpressionData data : dataTable){
-				double[] coord = new double[6];
-				coord[0] = data.x;
-				coord[1] = data.y;
-				coord[2] = data.z;
-				tesselator.gluTessVertex(coord, 0, new VertexData(coord));
+			GL11.glBegin(GL11.GL_LINE_LOOP);
+			Triangle_dt tri = iter.next();
+			GL11.glVertex3d(tri.p1().x(), tri.p1().y(), tri.p1().z());
+			GL11.glVertex3d(tri.p2().x(), tri.p2().y(), tri.p2().z());
+			if(tri.p3() == null){
+				GL11.glVertex3d(tri.p2().x(), tri.p2().y(), tri.p2().z());
 			}
-			tesselator.gluTessEndContour();
-			tesselator.gluTessEndPolygon();
-		GL11.glEndList();
+			else
+			{
+				GL11.glVertex3d(tri.p3().x(), tri.p3().y(), tri.p3().z());
+			}
+			GL11.glEnd();
+		}
 
-	}*/
+	}
 }

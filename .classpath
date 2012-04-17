@@ -25,5 +25,6 @@
 	<classpathentry kind="lib" path="lib/sqlitejdbc.jar"/>
 	<classpathentry kind="lib" path="lib/TWL.jar"/>
 	<classpathentry kind="lib" path="lib/xpp3-1.1.4c.jar"/>
+	<classpathentry kind="lib" path="lib/DT1.2.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
