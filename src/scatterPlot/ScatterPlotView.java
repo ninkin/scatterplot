@@ -3,33 +3,62 @@ import java.awt.BorderLayout;
 import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.geom.Point2D;
 import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.Dictionary;
+import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.net.ssl.SSLEngineResult.Status;
+import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSlider;
 import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.RowFilter;
+import javax.swing.RowSorter;
+import javax.swing.RowFilter.ComparisonType;
+import javax.swing.UIManager;
+import javax.swing.border.BevelBorder;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+import javax.swing.plaf.basic.BasicSliderUI;
+import javax.swing.table.TableModel;
+import javax.swing.table.TableRowSorter;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.util.Point;
 import org.lwjgl.util.glu.GLU;
 
+import de.matthiasmann.twl.Border;
 import de.matthiasmann.twl.GUI;
 import de.matthiasmann.twl.Label;
 import de.matthiasmann.twl.Widget;
@@ -48,15 +77,13 @@ public class ScatterPlotView extends Widget {
 	private static Camera camera;
 
 	//database
-	List<ExpressionData> dataTable;
 	static ScatterPlotModel spModel;
+	Vector<ExpressionData> dataVector;
 	JTable detailTable;
+	int totalSampleSize = 0;
+	int numOfshowingDots = 0;
 
-	//for landscape
-	double [][]landscape;
 	double maxXY;
-	int lod = 100;
-	Delaunay_Triangulation DT;
 
 
 	//to picking
@@ -78,29 +105,39 @@ public class ScatterPlotView extends Widget {
 	//axis
 	Label xAxisLabel = new Label("X");
 	Label yAxisLabel = new Label("Y");
-	Label zAxisLabel = new Label("Z");
 
-	//Buttons
-	JButton xyButton = new JButton();
-	JButton yzButton = new JButton();
-	JButton xzButton = new JButton();
+	//filtering values
+	double equalFilter = 0;
+	double smallFilter = -1000;
+	List<RowFilter<Object, Object>> tableFilter = new ArrayList<RowFilter<Object, Object>>(4);
 
+	//is log scale
+	boolean isLogScale = true;
 
-	public ScatterPlotView(List<ExpressionData> dataTable){
-		this.dataTable = dataTable;
-	}
+	JLabel statusLabel;
 
 	public static void main(String[] argv) {
 		spModel = new ScatterPlotModel();
 		spModel.readData();
-		ScatterPlotView spView = new ScatterPlotView(spModel.getDataTable());
+		ScatterPlotView spView = new ScatterPlotView();
 
 		spView.start();
 	}
+	void initFilters(){
+		tableFilter.add(RowFilter.regexFilter(""));
+		tableFilter.add(RowFilter.regexFilter(""));
+		tableFilter.add(RowFilter.regexFilter(""));
+		tableFilter.add(RowFilter.regexFilter(""));
+	}
 
 	public void start() {
-		maxXY = Math.max(spModel.getMaxX(), spModel.getMaxY());
-		camera = new Camera(-2*maxXY, 2*maxXY, -2*maxXY, 2*maxXY, -2*maxXY, 2*maxXY);
+		if(isLogScale){
+			maxXY = Math.log10(Math.max(spModel.getMaxX(), spModel.getMaxY()));
+		}
+		else{
+			maxXY = Math.max(spModel.getMaxX(), spModel.getMaxY());
+		}
+		camera = new Camera(-maxXY/10, 1.1*maxXY, -maxXY/10, 1.1*maxXY, 1, -1);
 		initLayout();
 		try {
 			canvas.setVisible(true);
@@ -118,8 +155,10 @@ public class ScatterPlotView extends Widget {
 		GUI gui = initTWL();
 		initOpenGL();
 		makeColorPalette();
-		initTerrain();
+		initFilters();
 		while (!Display.isCloseRequested() && ! closeRequested){
+
+			statusLabel.setText(detailTable.getRowCount()+"/"+totalSampleSize);
 			display();
 			mouseClickHandler(Mouse.getX(), Mouse.getY());
 			if(toolTipBox.getText()==null)
@@ -147,12 +186,10 @@ public class ScatterPlotView extends Widget {
             toolTipBox.setTheme("label");
             xAxisLabel.setTheme("bigLabel");
             yAxisLabel.setTheme("bigLabel");
-            zAxisLabel.setTheme("bigLabel");
 
     		add(toolTipBox);
     		add(xAxisLabel);
     		add(yAxisLabel);
-    		add(zAxisLabel);
     		return gui;
 		} catch (LWJGLException e1) {
 			// TODO Auto-generated catch block
@@ -164,36 +201,10 @@ public class ScatterPlotView extends Widget {
 		return null;
 	}
 	private void initLayout() {
-		xyButton.setText("XY");
-		xyButton.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				// TODO Auto-generated method stub
-				super.mouseClicked(e);
-				camera.setView("XY");
-			}
-		});
+		JPanel centerPanel = new JPanel();
+		JPanel statusPanel = new JPanel();
+		JPanel rightPanel = new JPanel();
 
-		yzButton.setText("YZ");
-		yzButton.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				// TODO Auto-generated method stub
-				super.mouseClicked(e);
-				camera.setView("YZ");
-			}
-		});
-
-
-		xzButton.setText("XZ");
-		xzButton.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				// TODO Auto-generated method stub
-				super.mouseClicked(e);
-				camera.setView("XZ");
-			}
-		});
 
 
 
@@ -220,23 +231,199 @@ public class ScatterPlotView extends Widget {
 			}
 		});
 
-		JPanel centerPanel = new JPanel();
 		centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
 		centerPanel.add(canvas);
 		JPanel leftPanel = new JPanel();
 		leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.X_AXIS));
 
-		JPanel rightPanel = new JPanel();
+
+
+
+		statusPanel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+		statusPanel.setPreferredSize(new Dimension(frame.getWidth(), 16));
+		statusPanel.setLayout(new BoxLayout(statusPanel, BoxLayout.X_AXIS));
+
+		statusLabel = new JLabel();
+
+		statusPanel.add(statusLabel);
+
 		rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
-		rightPanel.add(xyButton);
-		rightPanel.add(yzButton);
-		rightPanel.add(xzButton);
+/*		JCheckBox toggleLogScale = new JCheckBox("Log Scale");
+		toggleLogScale.setSelected(true);
+		toggleLogScale.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				// TODO Auto-generated method stub
+				isLogScale = ((JCheckBox)e.getSource()).isSelected();
+				if(isLogScale){
+					smallSlider.setMaximum((int)Math.log10(Math.max(spModel.getMaxX(), spModel.getMaxY())));
+					smallSlider.setValue(0);
+					equalSlider.setMaximum((int)Math.log10(Math.max(spModel.getMaxX(), spModel.getMaxY())));
+					equalSlider.setValue(0);
+
+				}
+				else{
+					smallSlider.setMaximum((int)(Math.max(spModel.getMaxX(), spModel.getMaxY())));
+					smallSlider.setValue(0);
+					equalSlider.setMaximum((int)(Math.max(spModel.getMaxX(), spModel.getMaxY())));
+					equalSlider.setValue(0);
+				}
+			}
+		});
+
+		rightPanel.add(toggleLogScale);*/
+		detailTable = new JTable(spModel.getDataTable(), spModel.getColumnNames());
+		totalSampleSize = detailTable.getRowCount();
+		detailTable.setRowSorter(new TableRowSorter<TableModel>(detailTable.getModel()));
+		JScrollPane tablePane = new JScrollPane(detailTable);
+		tablePane.setPreferredSize(new Dimension(400, 800));
+		rightPanel.add(tablePane);
+
+
+		JPanel smallSliderPanel = new JPanel();
+		JLabel smallFilterLabel = new JLabel("RPKM Filter");
+		final JTextField smallTextField = new JTextField(3);
+		final JSlider smallSlider = new JSlider(-2000,
+				(int)((isLogScale?Math.log10(Math.max(spModel.getMaxX(), spModel.getMaxY())): Math.max(spModel.getMaxX(), spModel.getMaxY()))*1000), -2000);
+		rightPanel.add(smallFilterLabel);
+		rightPanel.add(smallSliderPanel);
+
+
+		smallSliderPanel.setLayout(new BoxLayout(smallSliderPanel, BoxLayout.X_AXIS));
+		smallSliderPanel.add(smallTextField);
+
+		/***
+		 * Small Text Field
+		 */
+		smallTextField.setPreferredSize(new Dimension(20, 16));
+		smallTextField.addKeyListener(new KeyAdapter(){
+			public void keyPressed(KeyEvent e){
+				int key = e.getKeyCode();
+				if (key == KeyEvent.VK_ENTER) {
+					try{
+						double v = Double.parseDouble(smallTextField.getText());
+						smallSlider.setValue((int) (v*1000));
+					}
+					catch (NumberFormatException e1){
+						return ;
+					}
+				}
+			}
+		});
+		smallTextField.setEditable(true);
+
+
+		smallSlider.addChangeListener(new ChangeListener(){
+			@Override
+			public void stateChanged(ChangeEvent arg0) {
+				// TODO Auto-generated method stub
+				JSlider me = (JSlider)arg0.getSource();
+				// TODO Auto-generated method stub
+				smallFilter = me.getValue()/1000.0;
+				me.setToolTipText(""+me.getValue());
+				smallFilter = ((JSlider)arg0.getSource()).getValue()/1000.0;
+				tableFilter.set(0, RowFilter.numberFilter(ComparisonType.AFTER, Math.pow(10, smallSlider.getValue()/1000.0), 1));
+				tableFilter.set(1, RowFilter.numberFilter(ComparisonType.AFTER, Math.pow(10, smallSlider.getValue()/1000.0), 2));
+				((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
+				smallTextField.setText(""+me.getValue()/1000.0);
+
+
+				me.repaint();//for refresh thumb value
+			}
+		});
+		smallSlider.setPaintLabels(true);
+		smallSlider.setPaintTicks(true);
+		smallSlider.setMajorTickSpacing(1000);
+		smallSlider.setUI(new BasicSliderUI(smallSlider) {
+			  public void paintThumb(Graphics g) {
+				    super.paintThumb(g);
+				    g.setColor(Color.black);
+				    g.drawString(Double.toString(slider.getValue()/1000.0), thumbRect.x, thumbRect.y + thumbRect.height+10);
+				  }
+				});
+		Hashtable<Integer, JLabel> labelTable = new Hashtable<Integer, JLabel>();
+		labelTable.put(new Integer(-1000), new JLabel("-1.0"));
+		labelTable.put(new Integer(0), new JLabel("0.0"));
+		labelTable.put(new Integer(1000), new JLabel("1.0"));
+		labelTable.put(new Integer(2000), new JLabel("2.0"));
+		labelTable.put(new Integer(3000), new JLabel("3.0"));
+		labelTable.put(new Integer(4000), new JLabel("4.0"));
+		labelTable.put(new Integer(5000), new JLabel("5.0"));
+
+		smallSlider.setLabelTable(labelTable);
+		smallSlider.setPreferredSize(new Dimension(280, 40));
+		smallSliderPanel.add(smallSlider);
+
+
+
+
+
+		JLabel equalFilterLabel = new JLabel("Difference Filter");
+		final JTextField equalTextField = new JTextField();
+		final JSlider equalSlider = new JSlider(0,
+				(int)((isLogScale?(int)Math.log10(Math.max(spModel.getMaxX(), spModel.getMaxY())):(int) Math.max(spModel.getMaxX(), spModel.getMaxY()))*1000), 0);
+		rightPanel.add(equalFilterLabel);
+		JPanel equalPanel = new JPanel();
+		equalPanel.setLayout(new BoxLayout(equalPanel, BoxLayout.X_AXIS));
+		rightPanel.add(equalPanel);
+
+		/***
+		 * Equal Text Field
+		 */
+		equalTextField.setPreferredSize(new Dimension(20, 16));
+		equalTextField.addKeyListener(new KeyAdapter(){
+			public void keyPressed(KeyEvent e){
+				int key = e.getKeyCode();
+				if (key == KeyEvent.VK_ENTER) {
+					try{
+						double v = Double.parseDouble(equalTextField.getText());
+						equalSlider.setValue((int) (v*1000));
+					}
+					catch (NumberFormatException e1){
+						return ;
+					}
+				}
+			}
+		});
+		equalTextField.setEditable(true);
+		equalPanel.add(equalTextField);
+		equalSlider.addChangeListener(new ChangeListener(){
+
+			@Override
+			public void stateChanged(ChangeEvent arg0) {
+				JSlider me = (JSlider)arg0.getSource();
+				// TODO Auto-generated method stub
+				equalFilter = me.getValue()/1000.0;
+				me.setToolTipText(""+me.getValue());
+				tableFilter.set(2, RowFilter.numberFilter(ComparisonType.AFTER, equalSlider.getValue()/1000.0, 4));
+				((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
+				equalTextField.setText(""+me.getValue()/1000.0);
+				me.repaint();//for thumb value
+			}
+		});
+		equalSlider.setMajorTickSpacing(1000);
+		equalSlider.setPaintLabels(true);
+		equalSlider.setPaintTicks(true);
+		equalSlider.setLabelTable(labelTable);
+		equalSlider.setUI(new BasicSliderUI(equalSlider) {
+			  public void paintThumb(Graphics g) {
+				    super.paintThumb(g);
+				    g.setColor(Color.black);
+				    g.drawString(Double.toString(slider.getValue()/1000.0), thumbRect.x, thumbRect.y + thumbRect.height+10);
+				  }
+				});
+		equalPanel.add(equalSlider);
+
+
+
 
 		frame.add(centerPanel, BorderLayout.CENTER);
 		frame.add(leftPanel, BorderLayout.WEST);
 		frame.add(rightPanel, BorderLayout.EAST);
+		frame.add(statusPanel, BorderLayout.SOUTH);
 	}
 	private void initOpenGL() {
+
 		selectBuff = BufferUtils.createIntBuffer(1024);
 		GL11.glSelectBuffer(selectBuff);
 
@@ -249,6 +436,48 @@ public class ScatterPlotView extends Widget {
 		GL11.glEnable(GL11.GL_POINT_SMOOTH);
 		GL11.glEnable(GL11.GL_BLEND);
 		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+		FloatBuffer mat_specular = BufferUtils.createFloatBuffer(4);
+		mat_specular.put(1);
+		mat_specular.put(1);
+		mat_specular.put(1);
+		mat_specular.put(1);
+		mat_specular.rewind();
+
+		FloatBuffer light_position = BufferUtils.createFloatBuffer(4);
+		light_position.put(10000);
+		light_position.put(10000);
+		light_position.put(10000);
+		light_position.put(1);
+		light_position.rewind();
+
+		float mat_shininess = 70;
+
+		FloatBuffer white_light = BufferUtils.createFloatBuffer(4);
+		white_light.put(1);
+		white_light.put(1);
+		white_light.put(1);
+		white_light.put(1);
+		white_light.rewind();
+
+		FloatBuffer wlmodel_ambient = BufferUtils.createFloatBuffer(4);
+		wlmodel_ambient.put(0.1f);
+		wlmodel_ambient.put(0.1f);
+		wlmodel_ambient.put(0.1f);
+		wlmodel_ambient.put(0.1f);
+		wlmodel_ambient.rewind();
+
+		GL11.glShadeModel(GL11.GL_SMOOTH);
+		GL11.glMaterial(GL11.GL_FRONT, GL11.GL_SPECULAR, mat_specular);
+		GL11.glMaterial(GL11.GL_FRONT, GL11.GL_AMBIENT, mat_specular);
+		GL11.glMaterial(GL11.GL_FRONT, GL11.GL_DIFFUSE, mat_specular);
+		GL11.glMaterialf(GL11.GL_FRONT, GL11.GL_SHININESS, mat_shininess);
+		GL11.glLight(GL11.GL_LIGHT0, GL11.GL_POSITION, light_position);
+		GL11.glLight(GL11.GL_LIGHT0, GL11.GL_DIFFUSE, white_light);
+		GL11.glLight(GL11.GL_LIGHT0, GL11.GL_AMBIENT, wlmodel_ambient);
+
+		GL11.glEnable(GL11.GL_COLOR_MATERIAL);
+
+
 	}
 	private void makeColorPalette() {
 		colorPalette = new Vector<Color>();
@@ -272,14 +501,15 @@ public class ScatterPlotView extends Widget {
 					depth = selectBuff.get(loop*4+1);
 				}
 			}
-			ExpressionData data = dataTable.get(choose);
+			ExpressionData data = spModel.getDataTable().get(choose);
 			if(Mouse.isButtonDown(0)){
+				//TODO: highlight table row
 				clickedIndex = overedIndex;
 			}
 			else{
 				overedIndex = choose;
 			}
-			toolTipBox.setText(data.name+" ("+data.x+", "+data.y+")");
+			toolTipBox.setText(data.getName()+" ("+data.getX()+", "+data.getY()+")");
 		}
 		else{
 			overedIndex = -1;
@@ -294,38 +524,37 @@ public class ScatterPlotView extends Widget {
 
 	private void drawShadows() {
 		if(clickedIndex != -1){
-			ExpressionData e = dataTable.get(clickedIndex);
+			ExpressionData e = spModel.getDataTable().get(clickedIndex);
 			GL11.glColor3d(0, 0, 0);
 			GL11.glBegin(GL11.GL_LINES);
 
-			GL11.glVertex3d(e.x, e.y, e.z);
-			GL11.glVertex3d(0, e.y, e.z);
+			GL11.glVertex3d(e.getX(), e.getY(), e.getZ());
+			GL11.glVertex3d(0, e.getY(), e.getZ());
 
-			GL11.glVertex3d(0, e.y, e.z);
-			GL11.glVertex3d(0, 0, e.z);
+			GL11.glVertex3d(0, e.getY(), e.getZ());
+			GL11.glVertex3d(0, 0, e.getZ());
 
-			GL11.glVertex3d(0, e.y, e.z);
-			GL11.glVertex3d(0, e.y, 0);
+			GL11.glVertex3d(0, e.getY(), e.getZ());
+			GL11.glVertex3d(0, e.getY(), 0);
 
-			GL11.glVertex3d(e.x, e.y, e.z);
-			GL11.glVertex3d(e.x, e.y, 0);
+			GL11.glVertex3d(e.getX(), e.getY(), e.getZ());
+			GL11.glVertex3d(e.getX(), e.getY(), 0);
 
-			GL11.glVertex3d(e.x, e.y, 0);
-			GL11.glVertex3d(0, e.y, 0);
+			GL11.glVertex3d(e.getX(), e.getY(), 0);
+			GL11.glVertex3d(0, e.getY(), 0);
 
-			GL11.glVertex3d(e.x, e.y, 0);
-			GL11.glVertex3d(e.x, 0, 0);
+			GL11.glVertex3d(e.getX(), e.getY(), 0);
+			GL11.glVertex3d(e.getX(), 0, 0);
 
-			GL11.glVertex3d(e.x, e.y, e.z);
-			GL11.glVertex3d(e.x, 0, e.z);
+			GL11.glVertex3d(e.getX(), e.getY(), e.getZ());
+			GL11.glVertex3d(e.getX(), 0, e.getZ());
 
-			GL11.glVertex3d(e.x, 0, e.z);
-			GL11.glVertex3d(e.x, 0, 0);
+			GL11.glVertex3d(e.getX(), 0, e.getZ());
+			GL11.glVertex3d(e.getX(), 0, 0);
 
-			GL11.glVertex3d(e.x, 0, e.z);
-			GL11.glVertex3d(0, 0, e.z);
+			GL11.glVertex3d(e.getX(), 0, e.getZ());
+			GL11.glVertex3d(0, 0, e.getZ());
 			GL11.glEnd();
-
 		}
 	}
 
@@ -333,35 +562,51 @@ public class ScatterPlotView extends Widget {
 		GL11.glMatrixMode(GL11.GL_PROJECTION);
 		GL11.glLoadIdentity();
 
+
 		if(renderMode == GL11.GL_SELECT){
 			IntBuffer viewport = BufferUtils.createIntBuffer(16);
 			GL11.glGetInteger(GL11.GL_VIEWPORT, viewport);
 			GLU.gluPickMatrix(Mouse.getX(), Mouse.getY(), 3, 3, viewport);
 		}
 		double maxXY = Math.max(spModel.getMaxX(), spModel.getMaxY());
-		camera.getInput();
 		camera.move();
 
 		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT|GL11.GL_DEPTH_BUFFER_BIT);
 
+		GL11.glScaled(0.01, 0.01, 0.01);
+		GL11.glScaled(100, 100, 100);
+
+		GL11.glDisable(GL11.GL_TEXTURE_2D);
 
 		drawDots();
+		camera.getInput();
+
 		if(renderMode != GL11.GL_SELECT){
-			drawShadows();
+			//drawShadows();
 			drawAxis(maxXY);
-			drawTerrain();
+			drawXYLine();
 		}
-
-
 	}
 
 
 	private void drawDots() {
 		GL11.glInitNames();
 		GL11.glPointSize(7);
+		for(int i = 0; i < totalSampleSize; i++){
+			//TODO: dont use filter(). Instead, use table model
 
-		for(int i = 0; i < dataTable.size(); i++){
-			ExpressionData item = dataTable.get(i);
+			if(!filter(spModel.getDataTable().get(i)))
+				continue;
+			double x, y;
+			if(isLogScale){
+				x = Math.log10((Double)detailTable.getModel().getValueAt(i, 1));
+				y = Math.log10((Double)detailTable.getModel().getValueAt(i, 2));
+			}
+			else{
+				x = (Double)detailTable.getModel().getValueAt(i, 1);
+				y = (Double)detailTable.getModel().getValueAt(i, 2);
+			}
+
 			GL11.glPushName(i);
 			GL11.glBegin(GL11.GL_POINTS);
 
@@ -369,49 +614,50 @@ public class ScatterPlotView extends Widget {
 				GL11.glColor3f(0, 1, 1);
 			}
 			else{
-				GL11.glColor4d(
-						(colorPalette.get(0).getRed()*(1-(double)i/dataTable.size())+colorPalette.get(1).getRed()*((double)i/dataTable.size()))/255.0,
-						(colorPalette.get(0).getGreen()*(1-(double)i/dataTable.size())+colorPalette.get(1).getGreen()*((double)i/dataTable.size()))/255.0,
-						(colorPalette.get(0).getBlue()*(1-(double)i/dataTable.size())+colorPalette.get(1).getBlue()*((double)i/dataTable.size()))/255.0,
-						0.5);
-
+				GL11.glColor3d(colorPalette.get(0).getRed()/255.0, colorPalette.get(0).getGreen()/255.0, colorPalette.get(0).getBlue()/255.0);
 			}
 
-			GL11.glVertex3d(item.x, item.y, item.z);
+			GL11.glVertex2d(x, y);
 			GL11.glEnd();
 			GL11.glPopName();
 		}
 
 	}
-
-	private void drawAxis(double maxXY) {
-		int stride = (int)Math.pow(10, Math.floor(Math.log10(maxXY))-1);
+	private boolean filter(ExpressionData data){
+		double x = data.getX();
+		double y = data.getY();
+		if(isLogScale){
+			x = Math.log10(data.getX());
+			y = Math.log10(data.getY());
+		}
+		if(x < smallFilter || y < smallFilter){
+			return false;
+		}
+		else if(Math.abs(x - y) < equalFilter){
+			return false;
+		}
+		return true;
+	}
+	private void drawXYLine(){
 		GL11.glLineWidth(1);
 		GL11.glBegin(GL11.GL_LINES);
-
-		for(int i = 0; i < maxXY; i+= stride ){
-			if(i ==0 )
-				GL11.glColor3f(0, 0, 0);
-			else
-				GL11.glColor3d(0.8, 0.8, 0.8);
-			GL11.glVertex3d(0, i, 0);
-			GL11.glVertex3d(maxXY, i, 0);
-			GL11.glVertex3d(i, 0, 0);
-			GL11.glVertex3d(i, maxXY, 0);
-			GL11.glVertex3d(0, i, 0);
-			GL11.glVertex3d(0, i, maxXY);
-			GL11.glVertex3d(0, 0, i);
-			GL11.glVertex3d(0, maxXY, i);
-			GL11.glVertex3d(0, 0, i);
-			GL11.glVertex3d(maxXY, 0, i);
-			GL11.glVertex3d(i, 0, 0);
-			GL11.glVertex3d(i, 0, maxXY);
-		}
+		GL11.glVertex2d(0, 0);
+		GL11.glVertex2d(maxXY, maxXY);
+		GL11.glEnd();
+	}
+	private void drawAxis(double maxXY) {
+		GL11.glLineWidth(1);
+		GL11.glColor3d(0, 0, 0);
+		GL11.glBegin(GL11.GL_LINES);
+		GL11.glVertex2d(0, 0);
+		GL11.glVertex2d(maxXY, 0);
+		GL11.glVertex2d(0, 0);
+		GL11.glVertex2d(0, maxXY);
 		GL11.glEnd();
 
 
 		Vector<Float[]> intersect = new Vector<Float[]>();
-		float origin[] = new float[3];
+		float origin[] = new float[2];
 		Vector<float[]> axes = new Vector<float[]>();
 
 		IntBuffer viewport = BufferUtils.createIntBuffer(16);
@@ -437,13 +683,7 @@ public class ScatterPlotView extends Widget {
 		float t_y[] = {win_pos.get(0), win_pos.get(1)};;
 		axes.add(t_y);
 
-		GLU.gluProject(0, 0, 100, modelMatrix, projMatrix, viewport, win_pos);
-		float t_z[] = {win_pos.get(0), win_pos.get(1)};;
-		axes.add(t_z);
-
-
-
-		for(int i = 0; i < 3; i++){
+		for(int i = 0; i < 2; i++){
 			float[] axisSample = axes.get(i);
 			float intersectX0 = (axisSample[0] - origin[0])/(axisSample[1] - origin[1])*(0-origin[1])+origin[0]; // intersection point with bottom boundary
 			Float[] a = {intersectX0, 0f};
@@ -492,48 +732,17 @@ public class ScatterPlotView extends Widget {
 							axisLabel = yAxisLabel;
 							GLU.gluProject(0, (float) maxXY, 0, modelMatrix, projMatrix, viewport, win_pos);
 							break;
-						case 2:
-							axisLabel = zAxisLabel;
-							GLU.gluProject(0, 0, (float) maxXY, modelMatrix, projMatrix, viewport, win_pos);
-							break;
 					}
 					if(win_pos.get(0) > 0 && win_pos.get(0) < viewport.get(2) && win_pos.get(1) > 0 && win_pos.get(1) < viewport.get(3)){
 						xPos = (int) win_pos.get(0);
 						yPos = viewport.get(3) - (int) win_pos.get(1);
 					}
-					axisLabel.setPosition(xPos, yPos);
+					axisLabel.setPosition(xPos-10, yPos);
 
 
 				}
 			}
 		}
 	}
-	private void initTerrain(){
-		Point_dt[] ps = new Point_dt[dataTable.size()];
-		for(int i = 0; i < dataTable.size(); i++){
-			ps[i] = new Point_dt(dataTable.get(i).x, dataTable.get(i).y, dataTable.get(i).z);
-		}
-		DT = new Delaunay_Triangulation(ps);
-	}
-	private void drawTerrain(){
-
-		Iterator<Triangle_dt> iter = DT.trianglesIterator();
-		GL11.glColor3d(0.8, 0.8, 0.8);
-		while(iter.hasNext()){
-
-			GL11.glBegin(GL11.GL_LINE_LOOP);
-			Triangle_dt tri = iter.next();
-			GL11.glVertex3d(tri.p1().x(), tri.p1().y(), tri.p1().z());
-			GL11.glVertex3d(tri.p2().x(), tri.p2().y(), tri.p2().z());
-			if(tri.p3() == null){
-				GL11.glVertex3d(tri.p2().x(), tri.p2().y(), tri.p2().z());
-			}
-			else
-			{
-				GL11.glVertex3d(tri.p3().x(), tri.p3().y(), tri.p3().z());
-			}
-			GL11.glEnd();
-		}
-
-	}
 }
+

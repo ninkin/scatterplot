@@ -1,47 +1,37 @@
 package scatterPlot;
 import java.util.Vector;
 
-
-public class ExpressionData implements Comparable{
-	String name;
-	double x;
-	double y;
-	double z;
-	Vector<Object> data;
+import javax.swing.JLabel;
 
 
+public class ExpressionData extends Vector<Object>{
 	public ExpressionData(String name, double x, double y, double z){
-		this.name = name;
-		this.x = x;
-		this.y = y;
-		this.z = z;
-		data = new Vector<Object>();
+		this.add(name);
+		this.add(x);
+		this.add(y);
+		this.add(z);
+		this.add(Math.abs(Math.log10(x)-Math.log10(y)));
 	}
+
 	public String getName(){
-		return name;
+		return (String)this.get(0);
 	}
 	public double getX(){
-		return x;
+		return (Double) this.get(1);
 	}
 	public double getY(){
-		return y;
+		return (Double)this.get(2);
 	}
 	public double getZ(){
-		return z;
+		return (Double)this.get(3);
 	}
 	public void addData(Object e){
-		data.add(e);
+		this.add(e);
+	}
+	public double getDiff(){
+		return (Double) this.get(4);
 	}
 	public void setZ(double z){
-		this.z = z;
+		this.setElementAt(z, 3);
 	}
-	public Vector<Object> getData(){
-		return data;
-	}
-	@Override
-	public int compareTo(Object arg0) {
-		// TODO Auto-generated method stub
-		return z > ((ExpressionData)arg0).z ? 1 : -1;
-	}
-
 }

@@ -12,8 +12,8 @@ import java.util.Vector;
 
 
 public class ScatterPlotModel {
-	static double lod = 100;
-	private static List<ExpressionData> dataTable = new Vector<ExpressionData>();
+	private static Vector<ExpressionData> dataTable = new Vector<ExpressionData>();
+	public static Vector<Object> detail = new Vector<Object>();
 	private double minX;
 	private double maxX;
 	private double minY;
@@ -27,11 +27,8 @@ public class ScatterPlotModel {
 	public int getNumY(){
 		return numY;
 	}
-	public List<ExpressionData> getDataTable(){
+	public Vector<ExpressionData> getDataTable(){
 		return dataTable;
-	}
-	public double getLod(){
-		return lod;
 	}
 	public double getMinX(){
 		return minX;
@@ -45,7 +42,26 @@ public class ScatterPlotModel {
 	public double getMaxY(){
 		return maxY;
 	}
+	public Vector<String> getColumnNames(){
+		Vector<String> names = new Vector<String>();
+		names.add("Feature ID");
+		names.add("RPKM1");
+		names.add("RPKM2");
+		names.add("dens");
+		names.add("X-Y");
+		names.add("Expression Values");
+		names.add("Gene Length");
+		names.add("Unique Gene Reads");
+		return names;
+	}
 
+	private void readSQLData(String filename, String FeatureID, String RPKM1, String RPKM2, String Category){
+		Vector<ExpressionData> table = new Vector<ExpressionData>();
+
+	}
+	private void readTXTData(String filename, String FeatureID, String RPKM1, String RPKM2, String Category){
+
+	}
 	@SuppressWarnings("unchecked")
 	public void readData(){
 		maxX = Double.MIN_VALUE;
@@ -59,8 +75,11 @@ public class ScatterPlotModel {
 			stat.execute("ATTACH DATABASE \"Sample02.clt\" AS Sample02");
 			ResultSet rs = stat.executeQuery("SELECT a.Feature_ID, a.RPKM as RPKM1, b.RPKM as RPKM2, a.Expression_Values, a.Gene_length," +
 					" a.Unique_gene_reads, a.Total_gene_reads, a.Chromosome, a.Chromosome_region_start," +
-					" a.Chromosome_region_end FROM main.RPKM a INNER JOIN Sample02.RPKM b ON a.ROWID= b.ROWID ");
+					" a.Chromosome_region_end FROM main.RPKM a INNER JOIN Sample02.RPKM b ON a.RowID = b.RowID");
 			do{
+
+
+
 				String name = rs.getString(1);
 				double x = rs.getDouble(2);
 				double y = rs.getDouble(3);
@@ -71,6 +90,15 @@ public class ScatterPlotModel {
 				newData.addData(rs.getDouble(7));
 
 				dataTable.add(newData);
+
+
+				Vector<Object> data = new Vector<Object>();
+				data.add(rs.getString(1));
+				data.add(rs.getDouble(2));
+				detail.add(data);
+
+
+
 				if(maxX < x){
 					maxX = x;
 				}
@@ -84,12 +112,7 @@ public class ScatterPlotModel {
 					minY = y;
 				}
 			} while(rs.next());
-			for(ExpressionData data0 : dataTable){
-				for(ExpressionData data1 : dataTable){
-					if(!data0.equals(data1))
-						data0.z += kernelFunction(data0, data1);
-				}
-			}
+
 		}
 		catch(SQLException e){
 			e.printStackTrace();
