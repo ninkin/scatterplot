@@ -55,11 +55,14 @@ public class ScatterPlotModel {
 		return names;
 	}
 
-	private void readSQLData(String filename, String FeatureID, String RPKM1, String RPKM2, String Category){
+	private Vector<ExpressionData> readSQLData(String filename, String FeatureID, String RPKM1, String RPKM2, String Category){
 		Vector<ExpressionData> table = new Vector<ExpressionData>();
+		return table;
 
 	}
-	private void readTXTData(String filename, String FeatureID, String RPKM1, String RPKM2, String Category){
+	private Vector<ExpressionData> readTXTData(String filename, String FeatureID, String RPKM1, String RPKM2, String Category){
+		Vector<ExpressionData> table = new Vector<ExpressionData>();
+		return table;
 
 	}
 	@SuppressWarnings("unchecked")
