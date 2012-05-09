@@ -1,5 +1,10 @@
 package scatterPlot;
 import java.beans.Expression;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -13,22 +18,19 @@ import java.util.Vector;
 
 public class ScatterPlotModel {
 	private static Vector<ExpressionData> dataTable = new Vector<ExpressionData>();
-	public static Vector<Object> detail = new Vector<Object>();
-	private double minX;
-	private double maxX;
-	private double minY;
-	private double maxY;
-	private static int numX;
-	private static int numY;
+	private double minX = Double.MAX_VALUE;
+	private double maxX = Double.MIN_VALUE;
+	private double minY = Double.MAX_VALUE;
+	private double maxY = Double.MIN_VALUE;
 
-	public int getNumX(){
-		return numX;
-	}
-	public int getNumY(){
-		return numY;
-	}
 	public Vector<ExpressionData> getDataTable(){
 		return dataTable;
+	}
+	public double getMin(){
+		return Math.min(getMinX(), getMinY());
+	}
+	public double getMax(){
+		return Math.max(getMaxX(), getMaxY());
 	}
 	public double getMinX(){
 		return minX;
@@ -47,30 +49,15 @@ public class ScatterPlotModel {
 		names.add("Feature ID");
 		names.add("RPKM1");
 		names.add("RPKM2");
-		names.add("dens");
-		names.add("X-Y");
-		names.add("Expression Values");
-		names.add("Gene Length");
-		names.add("Unique Gene Reads");
+		names.add("COG Category");
 		return names;
 	}
 
-	private Vector<ExpressionData> readSQLData(String filename, String FeatureID, String RPKM1, String RPKM2, String Category){
+	public Vector<ExpressionData> readSQLData(String filename, String FeatureID, String RPKM1, String RPKM2, String Category){
 		Vector<ExpressionData> table = new Vector<ExpressionData>();
-		return table;
 
-	}
-	private Vector<ExpressionData> readTXTData(String filename, String FeatureID, String RPKM1, String RPKM2, String Category){
-		Vector<ExpressionData> table = new Vector<ExpressionData>();
-		return table;
+		/*
 
-	}
-	@SuppressWarnings("unchecked")
-	public void readData(){
-		maxX = Double.MIN_VALUE;
-		minX = Double.MAX_VALUE;
-		maxY = Double.MIN_VALUE;
-		minY = Double.MAX_VALUE;
 		try {
 			Class.forName("org.sqlite.JDBC");
 			Connection conn = DriverManager.getConnection("jdbc:sqlite:Sample01.clt");
@@ -86,19 +73,7 @@ public class ScatterPlotModel {
 				String name = rs.getString(1);
 				double x = rs.getDouble(2);
 				double y = rs.getDouble(3);
-				ExpressionData newData = new ExpressionData(name, x, y, 0);
-				newData.addData(rs.getDouble(4));
-				newData.addData(rs.getDouble(5));
-				newData.addData(rs.getDouble(6));
-				newData.addData(rs.getDouble(7));
 
-				dataTable.add(newData);
-
-
-				Vector<Object> data = new Vector<Object>();
-				data.add(rs.getString(1));
-				data.add(rs.getDouble(2));
-				detail.add(data);
 
 
 
@@ -123,6 +98,76 @@ public class ScatterPlotModel {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		*/
+		return table;
+
+	}
+	public void readTXTData(String filename, String FeatureID, String RPKM1, String RPKM2, String Category){
+		try {
+			BufferedReader in = new BufferedReader(new FileReader(filename));
+			String buffer;
+			int indexID = -1;
+			int indexRPKM1 = -1;
+			int indexRPKM2 = -1;
+			int indexCategory = -1;
+			buffer = in.readLine();
+			String[] tokens = buffer.split("\t");
+			for(int i = 0; i < tokens.length; i++){
+				if(tokens[i].compareTo(FeatureID)==0){
+					indexID = i;
+				}
+				else if(tokens[i].compareTo(RPKM1)==0){
+					indexRPKM1 = i;
+				}
+				else if(tokens[i].compareTo(RPKM2)==0){
+					indexRPKM2 = i;
+				}
+				else if(tokens[i].compareTo(Category)==0){
+					indexCategory = i;
+				}
+				else{
+					throw new IOException("Unconsistency between given column names and those in data.");
+				}
+			}
+
+
+
+			while((buffer = in.readLine()) != null){
+				tokens = buffer.split("\t");
+				String name = tokens[indexID];
+				double x = Double.parseDouble(tokens[indexRPKM1]);
+				double y = Double.parseDouble(tokens[indexRPKM2]);
+				String category = tokens[indexCategory];
+				if(x < minX && x != 0){
+					minX = x;
+				}
+				else if(x > maxX){
+					maxX = x;
+				}
+				if(y < minY && y != 0){
+					minY = y;
+				}
+				else if(y > maxY){
+					maxY = y;
+				}
+
+				ExpressionData newData = new ExpressionData(name, x, y, category);
+				dataTable.add(newData);
+			}
+
+
+
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public void readData(){
+
 	}
 	private double kernelFunction(ExpressionData data0, ExpressionData data1){
 		int interval = 3;
