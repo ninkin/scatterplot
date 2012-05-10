@@ -111,6 +111,8 @@ public class ScatterPlotView extends Widget {
 
 	//filtering values
 	List<RowFilter<Object, Object>> tableFilter = new ArrayList<RowFilter<Object, Object>>(4);
+	double smallFilter = Double.MIN_VALUE;
+	double equalFilter = 1;
 
 	//is log scale
 	boolean isLogScale = true;
@@ -163,7 +165,6 @@ public class ScatterPlotView extends Widget {
 					controlFrame.setLocation(mainFrame.getX()+mainFrame.getWidth(), mainFrame.getY());
 				}
 			});
-
 
 			controlFrame.setLocation(mainFrame.getX()+mainFrame.getWidth(), mainFrame.getY());
 			controlFrame.pack();
@@ -347,9 +348,8 @@ public class ScatterPlotView extends Widget {
 			@Override
 			public void stateChanged(ChangeEvent arg0) {
 				JSlider me = (JSlider)arg0.getSource();
-				final double smallFilter = me.getValue()/1000.0-.1;
+				smallFilter = me.getValue()/1000.0-.1;
 				me.setToolTipText(""+me.getValue());
-
 				tableFilter.set(0, new RowFilter<Object, Object>(){
 					public boolean include(Entry<? extends Object, ? extends Object> entry) {
 						if(isLogScale){
@@ -451,7 +451,7 @@ public class ScatterPlotView extends Widget {
 			@Override
 			public void stateChanged(ChangeEvent arg0) {
 				JSlider me = (JSlider)arg0.getSource();
-				final double equalFilter = me.getValue()/1000.0;
+				equalFilter = me.getValue()/1000.0;
 				me.setToolTipText(""+equalFilter);
 				tableFilter.set(1, new RowFilter<Object, Object>(){
 					public boolean include(Entry<? extends Object, ? extends Object> entry) {
@@ -558,6 +558,7 @@ public class ScatterPlotView extends Widget {
 
 
 		drawDots();
+		drawFilterArea();
 		camera.getInput();
 
 		if(renderMode != GL11.GL_SELECT){
@@ -797,6 +798,39 @@ public class ScatterPlotView extends Widget {
 				}
 			}
 		}
+	}
+	void drawFilterArea(){
+		//draw small
+		GL11.glColor4d(1, 0, 0, 0.2);
+		GL11.glBegin(GL11.GL_QUADS);
+		if(isLogScale){
+			GL11.glVertex2d(log2(0.1), log2(0.1));
+			GL11.glVertex2d(smallFilter, smallFilter);
+			GL11.glVertex2d(log2(spModel.getMax()), smallFilter);
+			GL11.glVertex2d(log2(spModel.getMax()), log2(.1));
+
+			GL11.glVertex2d(log2(0.1), log2(0.1));
+			GL11.glVertex2d(smallFilter, smallFilter);
+			GL11.glVertex2d(smallFilter, log2(spModel.getMax()));
+			GL11.glVertex2d(log2(.1), log2(spModel.getMax()));
+
+		}
+		else{
+			GL11.glVertex2d(0, 0);
+			GL11.glVertex2d(smallFilter, smallFilter);
+			GL11.glVertex2d(spModel.getMax(), smallFilter);
+			GL11.glVertex2d(spModel.getMax(), 0);
+
+			GL11.glVertex2d(0, 0);
+			GL11.glVertex2d(smallFilter, smallFilter);
+			GL11.glVertex2d(smallFilter, spModel.getMax());
+			GL11.glVertex2d(0, spModel.getMax());
+		}
+		GL11.glEnd();
+
+	}
+	private double log2(double a){
+		return Math.log(a)/Math.log(2);
 	}
 }
 
