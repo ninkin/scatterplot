@@ -111,7 +111,7 @@ public class ScatterPlotView extends Widget {
 
 	//filtering values
 	List<RowFilter<Object, Object>> tableFilter = new ArrayList<RowFilter<Object, Object>>(4);
-	double smallFilter = Double.MIN_VALUE;
+	double smallFilter = log2(0.1);
 	double equalFilter = 1;
 
 	//is log scale
@@ -825,6 +825,43 @@ public class ScatterPlotView extends Widget {
 			GL11.glVertex2d(smallFilter, smallFilter);
 			GL11.glVertex2d(smallFilter, spModel.getMax());
 			GL11.glVertex2d(0, spModel.getMax());
+		}
+		GL11.glEnd();
+
+
+		//draw equal
+		GL11.glColor3d(0.8, 0.8, 1);
+		GL11.glBegin(GL11.GL_TRIANGLES);
+		if(isLogScale){
+			double prev = 2;
+			for(double i = 2; i < spModel.getMax(); i+= 2){
+				GL11.glVertex2d(log2(0.1), log2(0.1));
+				GL11.glVertex2d(log2(prev), log2(prev*equalFilter));
+				GL11.glVertex2d(log2(i), log2(i*equalFilter));
+
+				GL11.glVertex2d(log2(0.1), log2(0.1));
+				GL11.glVertex2d(log2(prev*equalFilter), log2(prev));
+				GL11.glVertex2d(log2(i*equalFilter), log2(i));
+
+				prev = i;
+
+			}
+			GL11.glVertex2d(log2(0.1), log2(0.1));
+			GL11.glVertex2d(log2(spModel.getMax()), log2(spModel.getMax()));
+			GL11.glVertex2d(log2(spModel.getMax()), log2(spModel.getMax()*equalFilter));
+			GL11.glVertex2d(log2(0.1), log2(0.1));
+			GL11.glVertex2d(log2(spModel.getMax()), log2(spModel.getMax()));
+			GL11.glVertex2d(log2(spModel.getMax()*equalFilter), log2(spModel.getMax()));
+
+		}
+		else{
+			GL11.glVertex2d(0, 0);
+			GL11.glVertex2d(spModel.getMax(), spModel.getMax());
+			GL11.glVertex2d(spModel.getMax(), spModel.getMax()*equalFilter);
+
+			GL11.glVertex2d(0, 0);
+			GL11.glVertex2d(spModel.getMax(), spModel.getMax());
+			GL11.glVertex2d(spModel.getMax(), spModel.getMax()/equalFilter);
 		}
 		GL11.glEnd();
 
