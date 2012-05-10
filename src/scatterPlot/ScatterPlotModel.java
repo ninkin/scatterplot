@@ -22,6 +22,7 @@ public class ScatterPlotModel {
 	private double maxX = Double.MIN_VALUE;
 	private double minY = Double.MAX_VALUE;
 	private double maxY = Double.MIN_VALUE;
+	private double maxA = Double.MIN_VALUE;
 
 	public Vector<ExpressionData> getDataTable(){
 		return dataTable;
@@ -43,6 +44,9 @@ public class ScatterPlotModel {
 	}
 	public double getMaxY(){
 		return maxY;
+	}
+	public double getMaxA(){
+		return maxA;
 	}
 	public Vector<String> getColumnNames(){
 		Vector<String> names = new Vector<String>();
@@ -149,6 +153,9 @@ public class ScatterPlotModel {
 				}
 				else if(y > maxY){
 					maxY = y;
+				}
+				if(x != 0  && y != 0 && Math.max(x, y) / Math.min(x, y) > maxA){
+					maxA = Math.max(x, y) / Math.min(x, y);
 				}
 
 				ExpressionData newData = new ExpressionData(name, x, y, category);

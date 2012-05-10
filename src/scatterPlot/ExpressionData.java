@@ -10,6 +10,10 @@ public class ExpressionData extends Vector<Object>{
 		this.add(x);
 		this.add(y);
 		this.add(category);
+		if(x != 0 && y != 0)
+			this.add(Math.max(x, y)/Math.min(x,  y));
+		else
+			this.add(0);
 	}
 
 	public String getName(){

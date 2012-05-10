@@ -3,9 +3,11 @@ import java.awt.BorderLayout;
 import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.ComponentListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -79,7 +81,6 @@ public class ScatterPlotView extends Widget {
 
 	//database
 	static ScatterPlotModel spModel;
-	Vector<ExpressionData> dataVector;
 	JTable detailTable;
 	int totalSampleSize = 0;
 	int numOfshowingDots = 0;
@@ -130,14 +131,16 @@ public class ScatterPlotView extends Widget {
 		tableFilter.add(RowFilter.regexFilter(""));
 		tableFilter.add(RowFilter.regexFilter(""));
 	}
-
-	public void start() {
+	private void updateMaxXY(){
 		if(isLogScale){
 			maxXY = Math.log(Math.max(spModel.getMaxX(), spModel.getMaxY()))/Math.log(2);
 		}
 		else{
 			maxXY = Math.max(spModel.getMaxX(), spModel.getMaxY());
 		}
+	}
+	public void start() {
+		updateMaxXY();
 		camera = new Camera(-maxXY/10, 1.1*maxXY, -maxXY/10, 1.1*maxXY, 1, -1);
 		initLayout();
 		try {
@@ -148,35 +151,59 @@ public class ScatterPlotView extends Widget {
 			Display.setResizable(true);
 			Display.setVSyncEnabled(true);
 			mainFrame.pack();
+			mainFrame.addComponentListener(new ComponentAdapter() {
+				@Override
+				public void componentResized(ComponentEvent e) {
+					// TODO Auto-generated method stub
+					controlFrame.setLocation(mainFrame.getX()+mainFrame.getWidth(), mainFrame.getY());
+				}
+
+				@Override
+				public void componentMoved(ComponentEvent e) {
+					controlFrame.setLocation(mainFrame.getX()+mainFrame.getWidth(), mainFrame.getY());
+				}
+			});
+
 
 			controlFrame.setLocation(mainFrame.getX()+mainFrame.getWidth(), mainFrame.getY());
 			controlFrame.pack();
 			Display.create();
+
+			GUI gui = initTWL();
+			initOpenGL();
+			makeColorPalette();
+			initFilters();
+
+			LWJGLRenderer renderer = new LWJGLRenderer();
+
+			Dimension newDim;
+
+			while (!Display.isCloseRequested() && ! closeRequested){
+				newDim = newCanvasSize.getAndSet(null);
+
+				if(newDim != null){
+					GL11.glViewport(0, 0, newDim.width, newDim.height);
+					renderer.syncViewportSize();
+				}
+
+				statusLabel.setText(detailTable.getRowCount()+"/"+totalSampleSize);
+				display();
+				mouseClickHandler(Mouse.getX(), Mouse.getY());
+				if(toolTipBox.getText()==null)
+					toolTipBox.setVisible(false);
+				else
+					toolTipBox.setVisible(true);
+				toolTipBox.setPosition(Mouse.getX()+20, canvas.getHeight() - Mouse.getY()+10);
+				gui.update();
+				Display.update();
+			}
+			Display.destroy();
+			mainFrame.dispose();
+
+			System.exit(0);
 		} catch (LWJGLException e) {
 			e.printStackTrace();
-			System.exit(0);
 		}
-		GUI gui = initTWL();
-		initOpenGL();
-		makeColorPalette();
-		initFilters();
-		while (!Display.isCloseRequested() && ! closeRequested){
-
-			statusLabel.setText(detailTable.getRowCount()+"/"+totalSampleSize);
-			display();
-			mouseClickHandler(Mouse.getX(), Mouse.getY());
-			if(toolTipBox.getText()==null)
-				toolTipBox.setVisible(false);
-			else
-				toolTipBox.setVisible(true);
-			toolTipBox.setPosition(Mouse.getX()+20, canvas.getHeight() - Mouse.getY()+10);
-			gui.update();
-			Display.update();
-		}
-		Display.destroy();
-		mainFrame.dispose();
-
-		System.exit(0);
 	}
 
 	private GUI initTWL() {
@@ -188,6 +215,7 @@ public class ScatterPlotView extends Widget {
             gui.applyTheme(themeManager);
             toolTipBox.setAutoSize(true);
             toolTipBox.setTheme("label");
+            toolTipBox.setBorderSize(1);
             xAxisLabel.setTheme("bigLabel");
             yAxisLabel.setTheme("bigLabel");
 
@@ -196,22 +224,14 @@ public class ScatterPlotView extends Widget {
     		add(yAxisLabel);
     		return gui;
 		} catch (LWJGLException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		return null;
 	}
 	private void initLayout() {
 		controlFrame.setPreferredSize(new Dimension(600, 600));
-
-		JPanel centerPanel = new JPanel();
-		centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
-		mainFrame.add(centerPanel);
-
-
 
 		JPanel rightPanel = new JPanel();
 		controlFrame.add(rightPanel);
@@ -225,13 +245,13 @@ public class ScatterPlotView extends Widget {
 			public void componentResized(ComponentEvent e)
 			{ newCanvasSize.set(canvas.getSize()); }
 		});
-
-		mainFrame.addWindowFocusListener(new WindowAdapter() {
-			@Override
-			public void windowGainedFocus(WindowEvent e)
-			{ canvas.requestFocusInWindow(); }
-		});
 		mainFrame.addWindowListener(new WindowAdapter(){
+			@Override
+			public void windowClosing(WindowEvent e){
+				closeRequested = true;
+			}
+		});
+		controlFrame.addWindowListener(new WindowAdapter(){
 			@Override
 			public void windowClosing(WindowEvent e){
 				closeRequested = true;
@@ -257,7 +277,6 @@ public class ScatterPlotView extends Widget {
 		detailTable.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
-				// TODO Auto-generated method stub
 				JTable me = ((JTable)e.getSource());
 				clickedIndex = me.convertRowIndexToModel(me.getSelectedRow());
 			}
@@ -273,9 +292,9 @@ public class ScatterPlotView extends Widget {
 		scaleCheckBox.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent e) {
-				// TODO Auto-generated method stub
 				JCheckBox me = (JCheckBox)e.getSource();
 				isLogScale = me.isSelected();
+				updateMaxXY();
 			}
 		});
 		rightPanel.add(scaleCheckBox);
@@ -286,26 +305,26 @@ public class ScatterPlotView extends Widget {
 		final JTextField smallTextField = new JTextField(3);
 		final JSlider smallSlider = new JSlider();
 		if(isLogScale){
-			smallSlider.setMaximum((int)(Math.log(spModel.getMax())/Math.log(2)*1000));
-			smallSlider.setMinimum((int)(Math.log(spModel.getMin())/Math.log(2)*1000));
+			smallSlider.setMaximum((int)(Math.log(spModel.getMax()+.1)/Math.log(2)*1000));
+			smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
 			smallSlider.setValue(smallSlider.getMinimum());
 		}
 		else{
-			smallSlider.setMaximum((int)spModel.getMax());
+			smallSlider.setMaximum((int)(spModel.getMax()*1000));
 			smallSlider.setMinimum(0);
-			smallSlider.setValue(0);
+			smallSlider.setValue(smallSlider.getMinimum());
 		}
-		rightPanel.add(smallFilterLabel);
 		rightPanel.add(smallSliderPanel);
 
 
-		smallSliderPanel.setLayout(new BoxLayout(smallSliderPanel, BoxLayout.X_AXIS));
+		smallSliderPanel.setLayout(new FlowLayout());
+		smallSliderPanel.add(smallFilterLabel);
 		smallSliderPanel.add(smallTextField);
 
 		/***
 		 * Small Text Field
 		 */
-		smallTextField.setPreferredSize(new Dimension(20, 16));
+		smallTextField.setPreferredSize(new Dimension(100, 20));
 		smallTextField.addKeyListener(new KeyAdapter(){
 			public void keyPressed(KeyEvent e){
 				int key = e.getKeyCode();
@@ -327,18 +346,31 @@ public class ScatterPlotView extends Widget {
 		smallSlider.addChangeListener(new ChangeListener(){
 			@Override
 			public void stateChanged(ChangeEvent arg0) {
-				// TODO Auto-generated method stub
 				JSlider me = (JSlider)arg0.getSource();
-				// TODO Auto-generated method stub
-				double smallFilter = me.getValue()/1000.0;
+				final double smallFilter = me.getValue()/1000.0-.1;
 				me.setToolTipText(""+me.getValue());
-				tableFilter.set(0, RowFilter.numberFilter(ComparisonType.AFTER, Math.exp(smallFilter*Math.log(2)), 1));
-				tableFilter.set(1, RowFilter.numberFilter(ComparisonType.AFTER, Math.exp(smallFilter*Math.log(2)), 2));
+
+				tableFilter.set(0, new RowFilter<Object, Object>(){
+					public boolean include(Entry<? extends Object, ? extends Object> entry) {
+						if(isLogScale){
+							if(Math.log(Double.parseDouble(""+entry.getValue(1))+.1)/Math.log(2) > smallFilter &&
+									Math.log(Double.parseDouble(""+entry.getValue(2))+.1)/Math.log(2) > smallFilter)
+								return true;
+							else
+								return false;
+						}
+						else{
+							if(Double.parseDouble(""+entry.getValue(1)) > smallFilter &&
+									Double.parseDouble(""+entry.getValue(2)) > smallFilter)
+								return true;
+							else
+								return false;
+						}
+					}
+				});
 				((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
 				smallTextField.setText(""+me.getValue()/1000.0);
 
-
-				me.repaint();//for refresh thumb value
 			}
 		});
 
@@ -362,45 +394,40 @@ public class ScatterPlotView extends Widget {
 
 		smallSlider.setLabelTable(labelTable);
 		smallSlider.setPreferredSize(new Dimension(280, 40));
-		smallSliderPanel.add(smallSlider);
+		rightPanel.add(smallSlider);
 
 		scaleCheckBox.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent e) {
-
-				// TODO Auto-generated method stub
 				JCheckBox me = (JCheckBox)e.getSource();
 				isLogScale = me.isSelected();
 				if(isLogScale){
-					smallSlider.setMaximum((int)(Math.log(spModel.getMax())/Math.log(2)*1000));
-					smallSlider.setMinimum((int)(Math.log(spModel.getMin())/Math.log(2)*1000));
+					smallSlider.setMaximum((int)(Math.log(spModel.getMax()+.1)/Math.log(2)*1000));
+					smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
 					smallSlider.setValue(smallSlider.getMinimum());
-					smallSlider.setMajorTickSpacing(1000);
 				}
 				else{
-					smallSlider.setMaximum((int)spModel.getMax()*1000);
+					smallSlider.setMaximum((int)(spModel.getMax()*1000));
 					smallSlider.setMinimum(0);
-					smallSlider.setValue(0);
-					smallSlider.setMajorTickSpacing(1000000);
+					smallSlider.setValue(smallSlider.getMinimum());
 				}
 			}
 		});
 
 
+		JPanel equalPanel = new JPanel();
+		equalPanel.setLayout(new FlowLayout());
+		rightPanel.add(equalPanel);
 
 		JLabel equalFilterLabel = new JLabel("Difference Filter");
+		equalPanel.add(equalFilterLabel);
 		final JTextField equalTextField = new JTextField();
-		final JSlider equalSlider = new JSlider(0,
-				(int)((isLogScale?(int)Math.log10(Math.max(spModel.getMaxX(), spModel.getMaxY())):(int) Math.max(spModel.getMaxX(), spModel.getMaxY()))*1000), 0);
-		rightPanel.add(equalFilterLabel);
-		JPanel equalPanel = new JPanel();
-		equalPanel.setLayout(new BoxLayout(equalPanel, BoxLayout.X_AXIS));
-		rightPanel.add(equalPanel);
+		final JSlider equalSlider = new JSlider(1000, (int)(spModel.getMaxA()*1000), 1000);
 
 		/***
 		 * Equal Text Field
 		 */
-		equalTextField.setPreferredSize(new Dimension(20, 16));
+		equalTextField.setPreferredSize(new Dimension(100, 20));
 		equalTextField.addKeyListener(new KeyAdapter(){
 			public void keyPressed(KeyEvent e){
 				int key = e.getKeyCode();
@@ -417,32 +444,42 @@ public class ScatterPlotView extends Widget {
 		});
 		equalTextField.setEditable(true);
 		equalPanel.add(equalTextField);
+
+
 		equalSlider.addChangeListener(new ChangeListener(){
 
 			@Override
 			public void stateChanged(ChangeEvent arg0) {
 				JSlider me = (JSlider)arg0.getSource();
-				// TODO Auto-generated method stub
-				double equalFilter = me.getValue()/1000.0;
+				final double equalFilter = me.getValue()/1000.0;
 				me.setToolTipText(""+equalFilter);
-				tableFilter.set(2, RowFilter.numberFilter(ComparisonType.AFTER, equalFilter, 4));
+				tableFilter.set(1, new RowFilter<Object, Object>(){
+					public boolean include(Entry<? extends Object, ? extends Object> entry) {
+						double x = Double.parseDouble(""+entry.getValue(1));
+						double y = Double.parseDouble(""+entry.getValue(2));
+
+						if(Math.max(x, y)/Math.min(x, y) > equalFilter)
+							return true;
+						else
+							return false;
+					}
+				});
 				((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
-				equalTextField.setText(""+me.getValue()/1000.0);
-				me.repaint();//for thumb value
+				equalTextField.setText(""+equalFilter);
 			}
 		});
 		equalSlider.setMajorTickSpacing(1000);
 		equalSlider.setPaintLabels(true);
 		equalSlider.setPaintTicks(true);
 		equalSlider.setLabelTable(labelTable);
-		equalSlider.setUI(new BasicSliderUI(equalSlider) {
+/*		equalSlider.setUI(new BasicSliderUI(equalSlider) {
 			  public void paintThumb(Graphics g) {
 				    super.paintThumb(g);
 				    g.setColor(Color.black);
 				    g.drawString(Double.toString(slider.getValue()/1000.0), thumbRect.x, thumbRect.y + thumbRect.height+10);
 				  }
-				});
-		equalPanel.add(equalSlider);
+				});*/
+		rightPanel.add(equalSlider);
 
 
 	}
@@ -486,7 +523,6 @@ public class ScatterPlotView extends Widget {
 			ExpressionData data = spModel.getDataTable().get(choose);
 			if(Mouse.isButtonDown(0)){
 				System.out.println(hits);
-				//TODO: highlight table row
 				clickedIndex = overedIndex;
 				int index = detailTable.convertRowIndexToView(choose);
 				detailTable.getSelectionModel().setSelectionInterval(index, index);
@@ -545,8 +581,8 @@ public class ScatterPlotView extends Widget {
 				continue;//i is not shown
 			double x, y;
 			if(isLogScale){
-				x = Math.log((Double)detailTable.getModel().getValueAt(i, 1))/Math.log(2);
-				y = Math.log((Double)detailTable.getModel().getValueAt(i, 2))/Math.log(2);
+				x = Math.log((Double)detailTable.getModel().getValueAt(i, 1)+0.1)/Math.log(2);
+				y = Math.log((Double)detailTable.getModel().getValueAt(i, 2)+0.1)/Math.log(2);
 			}
 			else{
 				x = (Double)detailTable.getModel().getValueAt(i, 1);
