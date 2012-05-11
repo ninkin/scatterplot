@@ -19,8 +19,12 @@ import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -36,12 +40,15 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.RowFilter;
 import javax.swing.RowFilter.ComparisonType;
+import javax.swing.RowSorter;
+import javax.swing.SortOrder;
 import javax.swing.border.BevelBorder;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.plaf.basic.BasicSliderUI;
 import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
+import javax.swing.RowSorter.SortKey;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
@@ -81,6 +88,7 @@ public class ScatterPlotView extends Widget {
 	//database
 	static ScatterPlotModel spModel;
 	JTable detailTable;
+	Vector<String> selectedItems = new Vector<String>();
 	int totalSampleSize = 0;
 	int numOfshowingDots = 0;
 
@@ -94,6 +102,7 @@ public class ScatterPlotView extends Widget {
 	int renderMode = GL11.GL_RENDER;
 	int clickedIndex =-1;
 	int overedIndex =-1;
+	boolean isDowned = false;
 
 	ThemeManager themeManager;
 
@@ -301,8 +310,30 @@ public class ScatterPlotView extends Widget {
 			}
 		});
 		totalSampleSize = detailTable.getRowCount();
-		detailTable.setRowSorter(new TableRowSorter<TableModel>(detailTable.getModel()));
-		detailTable.getRowSorter().toggleSortOrder(3);
+		TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(detailTable.getModel());
+		sorter.setComparator(0, new Comparator(){
+			@Override
+			public int compare(Object o1, Object o2) {
+				// TODO Auto-generated method stub
+				String i1 = (String) o1;
+				String i2 = (String) o2;
+				for(int i = 0; i < selectedItems.size(); i++){
+					if(selectedItems.get(i).compareTo(i1) == 0)
+						return -1;
+					if(selectedItems.get(i).compareTo(i2) == 0)
+						return 1;
+				}
+				return 0;
+			}
+		});
+		Vector<RowSorter.SortKey> sortkeys = new Vector<RowSorter.SortKey>();
+		sortkeys.add(new RowSorter.SortKey(0, SortOrder.ASCENDING));
+		sortkeys.add(new RowSorter.SortKey(3, SortOrder.ASCENDING));
+		sorter.setSortKeys(sortkeys);
+		detailTable.setRowSorter(sorter);
+
+
+
 		JScrollPane tablePane = new JScrollPane(detailTable);
 		rightPanel.add(tablePane);
 
@@ -563,12 +594,26 @@ public class ScatterPlotView extends Widget {
 			}
 			ExpressionData data = spModel.getDataTable().get(choose);
 			if(Mouse.isButtonDown(0)){
-				System.out.println(hits);
+				isDowned = true;
+			}
+			else if(!Mouse.isButtonDown(0) && isDowned){
+				selectedItems.clear();
+				for(int loop = 0; loop < hits ; loop++){
+					int rowIndex = detailTable.convertRowIndexToView(selectBuff.get(loop*4+3));
+					selectedItems.add((String) detailTable.getValueAt(rowIndex, 0));
+					System.out.println(selectedItems.lastElement());
+				}
 				clickedIndex = overedIndex;
+				detailTable.getRowSorter().toggleSortOrder(0);
+				detailTable.getRowSorter().toggleSortOrder(0);
+
 				int index = detailTable.convertRowIndexToView(choose);
-				detailTable.getSelectionModel().setSelectionInterval(index, index);
+				detailTable.getSelectionModel().setSelectionInterval(0, hits-1);
 				detailTable.scrollRectToVisible(detailTable.getCellRect(index, 0, true));
 				detailTable.repaint();
+
+
+				isDowned = false;
 			}
 			else{
 				overedIndex = choose;
