@@ -108,6 +108,7 @@ public class ScatterPlotView extends Widget {
 	//axis
 	Label xAxisLabel = new Label("X");
 	Label yAxisLabel = new Label("Y");
+	Label xyLabel = new Label("X = Y");
 
 	//filtering values
 	List<RowFilter<Object, Object>> tableFilter = new ArrayList<RowFilter<Object, Object>>(4);
@@ -219,10 +220,12 @@ public class ScatterPlotView extends Widget {
             toolTipBox.setBorderSize(1);
             xAxisLabel.setTheme("bigLabel");
             yAxisLabel.setTheme("bigLabel");
+            xyLabel.setTheme("bigLabel");
 
     		add(toolTipBox);
     		add(xAxisLabel);
     		add(yAxisLabel);
+    		add(xyLabel);
     		return gui;
 		} catch (LWJGLException e1) {
 			e1.printStackTrace();
@@ -694,14 +697,42 @@ public class ScatterPlotView extends Widget {
 	}
 
 	private void drawXYLine(){
-		GL11.glLineWidth(1);
+		GL11.glLineWidth(2);
 		GL11.glBegin(GL11.GL_LINES);
 		GL11.glVertex2d(0, 0);
 		GL11.glVertex2d(maxXY, maxXY);
 		GL11.glEnd();
+		int [] pos = getBoundary(maxXY, maxXY, 0);
+		xyLabel.setPosition(pos[0]-50, pos[1]+50);
+
+	}
+	/***
+	 * returns intersection point with boundaries
+	 * @param x
+	 * @param y
+	 * @param z
+	 * @return
+	 */
+	int []getBoundary(double x, double y, double z){
+		int [] coord = Translater.getScreenCoordinate((float)x, (float)y, (float)z);
+		if(coord[0] > Display.getWidth()){
+			coord[0] = Display.getWidth();
+		}
+		else if(coord[0] < 0){
+			coord[0] = 0;
+		}
+		if(coord[1] > Display.getHeight()){
+			coord[1] = Display.getHeight();
+		}
+		else if(coord[1] < 0){
+			coord[1] = 0;
+		}
+		coord[1] = Display.getHeight() - coord[1];
+
+		return coord;
 	}
 	private void drawAxis(double maxXY) {
-		GL11.glLineWidth(1);
+		GL11.glLineWidth(2);
 		GL11.glColor3d(0, 0, 0);
 		GL11.glBegin(GL11.GL_LINES);
 		GL11.glVertex2d(0, 0);
@@ -710,99 +741,12 @@ public class ScatterPlotView extends Widget {
 		GL11.glVertex2d(0, maxXY);
 		GL11.glEnd();
 
+		int xpos[] = getBoundary(maxXY, 0, 0);
+		int ypos[] = getBoundary(0, maxXY, 0);
 
-		Vector<Float[]> intersect = new Vector<Float[]>();
-		float origin[] = new float[2];
+		xAxisLabel.setPosition(xpos[0]-10, xpos[1]+10);
+		yAxisLabel.setPosition(ypos[0]-10, ypos[1]+10);
 
-		IntBuffer viewport = BufferUtils.createIntBuffer(16);
-		GL11.glGetInteger(GL11.GL_VIEWPORT, viewport);
-
-		FloatBuffer modelMatrix = BufferUtils.createFloatBuffer(16);
-		GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, modelMatrix);
-
-		FloatBuffer projMatrix = BufferUtils.createFloatBuffer(16);
-		GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, projMatrix);
-		FloatBuffer win_pos = BufferUtils.createFloatBuffer(16);
-
-		GLU.gluProject(0, 0, 0, modelMatrix, projMatrix, viewport, win_pos);
-
-		origin[0] = win_pos.get(0);
-		origin[1] = win_pos.get(1);
-
-		GLU.gluProject(100, 0, 0, modelMatrix, projMatrix, viewport, win_pos);
-		float t_x[] = {win_pos.get(0), win_pos.get(1)};;
-
-
-		GLU.gluProject(0, 100, 0, modelMatrix, projMatrix, viewport, win_pos);
-		float t_y[] = {win_pos.get(0), win_pos.get(1)};;
-
-
-		for(int i = 0; i < 2; i++){
-
-			float[] axisSample;
-			if(i == 0)
-				axisSample = t_x;
-			else
-				axisSample = t_y;
-			float intersectX0 = (axisSample[0] - origin[0])/(axisSample[1] - origin[1])*(0-origin[1])+origin[0]; // intersection point with bottom boundary
-			Float[] a = {intersectX0, 0f};
-			intersect.add(a);
-			Float intersectX1 = (axisSample[0] - origin[0])/(axisSample[1] - origin[1])*(viewport.get(3)-origin[1])+origin[0];// intersection point with top boundary
-			Float[] b= {intersectX1, (float)viewport.get(3)};
-			intersect.add(b);
-			Float intersectY0 = (axisSample[1] - origin[1])/(axisSample[0] - origin[0])*(0-origin[0])+origin[1];// intersection point with left boundary
-			Float[] c= {0f, intersectY0};
-			intersect.add(c);
-			Float intersectY1 = (axisSample[1] - origin[1])/(axisSample[0] - origin[0])*(viewport.get(2)-origin[0])+origin[1];// intersection point with right boundary
-			Float[] d= {(float)viewport.get(2), intersectY1};
-			intersect.add(d);
-
-			for(Float[] intersectPoint: intersect){
-				if(intersectPoint[0] < 0 || intersectPoint[0] > viewport.get(2)
-						|| intersectPoint[1] < 0 || intersectPoint[1] > viewport.get(3)
-						|| (axisSample[0]-origin[0]) * (intersectPoint[0] - origin[0]) < 0
-						|| (axisSample[1]-origin[1]) * (intersectPoint[1] - origin[1]) < 0 ){
-				}
-				else{
-
-					if(intersectPoint[0]==0){
-						intersectPoint[0] += 10;
-					}
-					else if(intersectPoint[0]==viewport.get(2)){
-						intersectPoint[0] -= 10;
-					}
-					if(intersectPoint[1]==0){
-						intersectPoint[1] += 10;
-					}
-					else if(intersectPoint[1]==viewport.get(3)){
-						intersectPoint[1] -= 10;
-					}
-					int xPos = intersectPoint[0].intValue();
-					int yPos = viewport.get(3) - intersectPoint[1].intValue();
-					//check is in viewport
-					Label axisLabel = xAxisLabel;
-					switch(i){
-						case 0:
-							axisLabel = xAxisLabel;
-							GLU.gluProject((float) maxXY, 0, 0, modelMatrix, projMatrix, viewport, win_pos);
-							break;
-						case 1:
-							axisLabel = yAxisLabel;
-							GLU.gluProject(0, (float) maxXY, 0, modelMatrix, projMatrix, viewport, win_pos);
-							break;
-					}
-					if(win_pos.get(0) > 0 && win_pos.get(0) < viewport.get(2) && win_pos.get(1) > 0 && win_pos.get(1) < viewport.get(3)){
-						xPos = (int) win_pos.get(0);
-						yPos = viewport.get(3) - (int) win_pos.get(1);
-					}
-					if(i == 0)
-						axisLabel.setPosition(xPos, yPos-10);
-					else
-						axisLabel.setPosition(xPos-10, yPos);
-
-				}
-			}
-		}
 	}
 	void drawFilterArea(){
 		//draw small
