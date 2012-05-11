@@ -713,7 +713,6 @@ public class ScatterPlotView extends Widget {
 
 		Vector<Float[]> intersect = new Vector<Float[]>();
 		float origin[] = new float[2];
-		Vector<float[]> axes = new Vector<float[]>();
 
 		IntBuffer viewport = BufferUtils.createIntBuffer(16);
 		GL11.glGetInteger(GL11.GL_VIEWPORT, viewport);
@@ -732,14 +731,19 @@ public class ScatterPlotView extends Widget {
 
 		GLU.gluProject(100, 0, 0, modelMatrix, projMatrix, viewport, win_pos);
 		float t_x[] = {win_pos.get(0), win_pos.get(1)};;
-		axes.add(t_x);
+
 
 		GLU.gluProject(0, 100, 0, modelMatrix, projMatrix, viewport, win_pos);
 		float t_y[] = {win_pos.get(0), win_pos.get(1)};;
-		axes.add(t_y);
+
 
 		for(int i = 0; i < 2; i++){
-			float[] axisSample = axes.get(i);
+
+			float[] axisSample;
+			if(i == 0)
+				axisSample = t_x;
+			else
+				axisSample = t_y;
 			float intersectX0 = (axisSample[0] - origin[0])/(axisSample[1] - origin[1])*(0-origin[1])+origin[0]; // intersection point with bottom boundary
 			Float[] a = {intersectX0, 0f};
 			intersect.add(a);
@@ -754,7 +758,6 @@ public class ScatterPlotView extends Widget {
 			intersect.add(d);
 
 			for(Float[] intersectPoint: intersect){
-
 				if(intersectPoint[0] < 0 || intersectPoint[0] > viewport.get(2)
 						|| intersectPoint[1] < 0 || intersectPoint[1] > viewport.get(3)
 						|| (axisSample[0]-origin[0]) * (intersectPoint[0] - origin[0]) < 0
@@ -792,8 +795,10 @@ public class ScatterPlotView extends Widget {
 						xPos = (int) win_pos.get(0);
 						yPos = viewport.get(3) - (int) win_pos.get(1);
 					}
-					axisLabel.setPosition(xPos-10, yPos);
-
+					if(i == 0)
+						axisLabel.setPosition(xPos, yPos-10);
+					else
+						axisLabel.setPosition(xPos-10, yPos);
 
 				}
 			}
