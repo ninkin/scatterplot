@@ -85,6 +85,8 @@ public class ScatterPlotView extends Widget {
 	int numOfshowingDots = 0;
 
 	double maxXY;
+	double maxX;
+	double maxY;
 
 
 	//to picking
@@ -104,10 +106,12 @@ public class ScatterPlotView extends Widget {
 	JFrame controlFrame = new JFrame("Control Frame");
 	final Canvas canvas = new Canvas();
 
-	//axis
+	//labels
 	Label xAxisLabel = new Label("X");
 	Label yAxisLabel = new Label("Y");
 	Label xyLabel = new Label("X = Y");
+	Label xMaxLabel = new Label();
+	Label yMaxLabel = new Label();
 
 	//filtering values
 	List<RowFilter<Object, Object>> tableFilter = new ArrayList<RowFilter<Object, Object>>(4);
@@ -140,9 +144,13 @@ public class ScatterPlotView extends Widget {
 	private void updateMaxXY(){
 		if(isLogScale){
 			maxXY = Math.log(Math.max(spModel.getMaxX(), spModel.getMaxY()))/Math.log(2);
+			maxX = Math.log(spModel.getMaxX())/Math.log(2);
+			maxY = Math.log(spModel.getMaxY())/Math.log(2);
 		}
 		else{
 			maxXY = Math.max(spModel.getMaxX(), spModel.getMaxY());
+			maxX = spModel.getMaxX();
+			maxY = spModel.getMaxY();
 		}
 	}
 	public void start() {
@@ -224,11 +232,15 @@ public class ScatterPlotView extends Widget {
             xAxisLabel.setTheme("bigLabel");
             yAxisLabel.setTheme("bigLabel");
             xyLabel.setTheme("bigLabel");
+            xMaxLabel.setTheme("label");
+            yMaxLabel.setTheme("label");
 
     		add(toolTipBox);
     		add(xAxisLabel);
     		add(yAxisLabel);
     		add(xyLabel);
+    		add(xMaxLabel);
+    		add(yMaxLabel);
     		return gui;
 		} catch (LWJGLException e1) {
 			e1.printStackTrace();
@@ -585,9 +597,7 @@ public class ScatterPlotView extends Widget {
 
 		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT|GL11.GL_DEPTH_BUFFER_BIT);
 
-
 		drawDots();
-		drawFilterArea();
 		camera.getInput();
 
 		if(renderMode != GL11.GL_SELECT){
@@ -598,7 +608,8 @@ public class ScatterPlotView extends Widget {
 			else{
 				drawAxis(Math.max(spModel.getMaxX(), spModel.getMaxX()));
 			}
-
+			drawFilterArea();
+			drawMinMax();
 			drawXYLine();
 		}
 	}
@@ -686,13 +697,13 @@ public class ScatterPlotView extends Widget {
 		GL11.glColor3d(0, 0, 0);
 		GL11.glBegin(GL11.GL_LINES);
 		GL11.glVertex2d(0, 0);
-		GL11.glVertex2d(maxXY, 0);
+		GL11.glVertex2d(maxXY*1.1, 0);
 		GL11.glVertex2d(0, 0);
-		GL11.glVertex2d(0, maxXY);
+		GL11.glVertex2d(0, maxXY*1.1);
 		GL11.glEnd();
 
-		int xpos[] = getBoundary(maxXY, 0, 0);
-		int ypos[] = getBoundary(0, maxXY, 0);
+		int xpos[] = getBoundary(maxXY*1.15, 0, 0);
+		int ypos[] = getBoundary(0, maxXY*1.15, 0);
 
 		xAxisLabel.setPosition(xpos[0]-10, xpos[1]+10);
 		yAxisLabel.setPosition(ypos[0]-10, ypos[1]+10);
@@ -767,6 +778,26 @@ public class ScatterPlotView extends Widget {
 	}
 	private double log2(double a){
 		return Math.log(a)/Math.log(2);
+	}
+	private void drawMinMax(){
+		GL11.glColor3d(0, 0, 0);
+		int xpos[] = Translater.getScreenCoordinate((float) maxX, 0, 0);
+		xMaxLabel.setText(spModel.getMaxX()+"");
+		xMaxLabel.setPosition(xpos[0], Display.getHeight()-xpos[1]+xMaxLabel.getPreferredHeight());
+		GL11.glBegin(GL11.GL_LINES);
+		GL11.glVertex2d(maxX, -.1);
+		GL11.glVertex2d(maxX, .1);
+		GL11.glEnd();
+
+		int ypos[] = Translater.getScreenCoordinate(0, (float) maxY, 0);
+		yMaxLabel.setText(spModel.getMaxY()+"");
+		yMaxLabel.setPosition(ypos[0] - yMaxLabel.getPreferredWidth(), Display.getHeight()-ypos[1]);
+		GL11.glBegin(GL11.GL_LINES);
+		GL11.glVertex2d(-.1, maxY);
+		GL11.glVertex2d(.1, maxY);
+		GL11.glEnd();
+
+
 	}
 }
 
