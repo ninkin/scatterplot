@@ -71,7 +71,6 @@ import de.matthiasmann.twl.theme.ThemeManager;
 * LEGALLY FOR ANY CORPORATE OR COMMERCIAL PURPOSE.
 */
 public class ScatterPlotView extends Widget {
-	Vector<Color> colorPalette;
 	// UI initialize
 	private final static AtomicReference<Dimension> newCanvasSize = new AtomicReference<Dimension>();
 	boolean closeRequested = false;
@@ -119,6 +118,10 @@ public class ScatterPlotView extends Widget {
 	boolean isLogScale = true;
 
 	JLabel statusLabel;
+
+
+	//for drawing
+	Hashtable<String, Color> colormap = new Hashtable<String, Color>();
 
 	public static void main(String[] argv) {
 		spModel = new ScatterPlotModel();
@@ -173,7 +176,7 @@ public class ScatterPlotView extends Widget {
 
 			GUI gui = initTWL();
 			initOpenGL();
-			makeColorPalette();
+			makeColorMap();
 			initFilters();
 
 			LWJGLRenderer renderer = new LWJGLRenderer();
@@ -501,10 +504,33 @@ public class ScatterPlotView extends Widget {
 
 
 	}
-	private void makeColorPalette() {
-		colorPalette = new Vector<Color>();
-		colorPalette.add(new Color(190, 160, 37));
-		colorPalette.add(new Color(190, 37, 37));
+	private void makeColorMap() {
+		int alpha = 100;
+		colormap.put("J", new Color(255, 0, 0, alpha));
+		colormap.put("A", new Color(194, 175, 88, alpha));
+		colormap.put("K", new Color(255, 153, 0, alpha));
+		colormap.put("L", new Color(255, 255, 0, alpha));
+		colormap.put("B", new Color(255, 198, 0, alpha));
+		colormap.put("D", new Color(0x99, 0xff, 0, alpha));
+		colormap.put("Y", new Color(0x49, 0x31, 0x26, alpha));
+		colormap.put("V", new Color(0xff, 0x0, 0x8a, alpha));
+		colormap.put("T", new Color(0, 0, 0xff, alpha));
+		colormap.put("M", new Color(0x9e, 0xc9, 0x28, alpha));
+		colormap.put("N", new Color(0x0, 0x66, 0x33, alpha));
+		colormap.put("Z", new Color(0x66, 0, 0x99, alpha));
+		colormap.put("W", new Color(0x33, 0x66, 0x99, alpha));
+		colormap.put("U", new Color(0x33, 0xcc, 0x99, alpha));
+		colormap.put("O", new Color(0x0, 0xff, 0xff, alpha));
+		colormap.put("C", new Color(0x99, 0x00, 0xff, alpha));
+		colormap.put("G", new Color(0x80, 0x56, 0x42, alpha));
+		colormap.put("E", new Color(0xff, 0x0, 0xff, alpha));
+		colormap.put("F", new Color(0x99, 0x33, 0x4d, alpha));
+		colormap.put("H", new Color(0x72, 0x7d, 0xcc, alpha));
+		colormap.put("I", new Color(0x5c, 0x5a, 0x1b, alpha));
+		colormap.put("P", new Color(0x0, 0x99, 0xff, alpha));
+		colormap.put("Q", new Color(0xff, 0xcc, 0x99, alpha));
+		colormap.put("R", new Color(0xff, 0x99, 0x99, alpha));
+		colormap.put("S", new Color(0xd6, 0xaa, 0xdf, alpha));
 	}
 
 	void mouseClickHandler(int x, int y){
@@ -604,7 +630,7 @@ public class ScatterPlotView extends Widget {
 			}
 			else{
 				GL11.glPointSize(7);
-				Color categoryColor = getColorByCategory(detailTable.getModel().getValueAt(i, 3).toString().charAt(0));
+				Color categoryColor = getColorByCategory(detailTable.getModel().getValueAt(i, 3).toString().substring(0, 1));
 				GL11.glColor4d(categoryColor.getRed()/255.0, categoryColor.getGreen()/255.0, categoryColor.getBlue()/255.0, categoryColor.getAlpha()/255.0);
 				GL11.glBegin(GL11.GL_POINTS);
 				GL11.glVertex2d(x, y);
@@ -614,86 +640,10 @@ public class ScatterPlotView extends Widget {
 		}
 
 	}
-	private Color getColorByCategory(char category){
-		int alpha = 255;
-		if(category=='J'){
-			return new Color(255, 0, 0, alpha);
-		}
-		else if(category=='A'){
-			return new Color(194, 175, 88, alpha);
-		}
-		else if(category=='K'){
-			return new Color(255, 153, 0, alpha);
-		}
-		else if(category=='L'){
-			return new Color(255, 255, 0, alpha);
-		}
-		else if(category =='B'){
-			return new Color(255, 198, 0, alpha);
-		}
-		else if(category=='D'){
-			return new Color(0x99, 0xff, 0, alpha);
-		}
-		else if(category =='Y'){
-			return new Color(0x49, 0x31, 0x26, alpha);
-		}
-		else if(category =='V'){
-			return new Color(0xff, 0x0, 0x8a, alpha);
-		}
-		else if(category =='T'){
-			return new Color(0, 0, 0xff, alpha);
-		}
-		else if(category =='M'){
-			return new Color(0x9e, 0xc9, 0x28, alpha);
-		}
-		else if(category =='N'){
-			return new Color(0x0, 0x66, 0x33, alpha);
-		}
-		else if(category =='Z'){
-			return new Color(0x66, 0, 0x99, alpha);
-		}
-		else if(category =='W'){
-			return new Color(0x33, 0x66, 0x99, alpha);
-		}
-		else if(category =='U'){
-			return new Color(0x33, 0xcc, 0x99, alpha);
-		}
-		else if(category =='O'){
-			return new Color(0x0, 0xff, 0xff, alpha);
-		}
-		else if(category =='C'){
-			return new Color(0x99, 0, 0xff, alpha);
-		}
-		else if(category =='G'){
-			return new Color(0x80, 0x56, 0x42, alpha);
-		}
-		else if(category =='E'){
-			return new Color(0xff, 0, 0xff, alpha);
-		}
-		else if(category =='F'){
-			return new Color(0x99, 0x33, 0x4d, alpha);
-		}
-		else if(category =='H'){
-			return new Color(0x72, 0x7d, 0xcc, alpha);
-		}
-		else if(category =='I'){
-			return new Color(0x5c, 0x5a, 0x1b, alpha);
-		}
-		else if(category =='P'){
-			return new Color(0, 0x99, 0xff, alpha);
-		}
-		else if(category =='Q'){
-			return new Color(0xff, 0xcc, 0x99, alpha);
-		}
-		else if(category =='R'){
-			return new Color(0xff, 0x99, 0x99, alpha);
-		}
-		else if(category =='S'){
-			return new Color(0xd6, 0xaa, 0xdf, alpha);
-		}
-		else{
-			return Color.black;
-		}
+	private Color getColorByCategory(String category){
+
+		return colormap.get(category);
+
 	}
 
 	private void drawXYLine(){
