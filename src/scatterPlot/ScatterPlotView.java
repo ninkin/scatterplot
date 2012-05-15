@@ -50,6 +50,8 @@ import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
 import javax.swing.RowSorter.SortKey;
 
+import net.java.games.input.RawInputEnvironmentPlugin;
+
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Mouse;
@@ -65,18 +67,6 @@ import de.matthiasmann.twl.Widget;
 import de.matthiasmann.twl.renderer.lwjgl.LWJGLRenderer;
 import de.matthiasmann.twl.theme.ThemeManager;
 
-/**
-* This code was edited or generated using CloudGarden's Jigloo
-* SWT/Swing GUI Builder, which is free for non-commercial
-* use. If Jigloo is being used commercially (ie, by a corporation,
-* company or business for any purpose whatever) then you
-* should purchase a license for each developer using Jigloo.
-* Please visit www.cloudgarden.com for details.
-* Use of Jigloo implies acceptance of these licensing terms.
-* A COMMERCIAL LICENSE HAS NOT BEEN PURCHASED FOR
-* THIS MACHINE, SO JIGLOO OR THIS CODE CANNOT BE USED
-* LEGALLY FOR ANY CORPORATE OR COMMERCIAL PURPOSE.
-*/
 public class ScatterPlotView extends Widget {
 	// UI initialize
 	private final static AtomicReference<Dimension> newCanvasSize = new AtomicReference<Dimension>();
@@ -88,6 +78,7 @@ public class ScatterPlotView extends Widget {
 	//database
 	static ScatterPlotModel spModel;
 	JTable detailTable;
+	static Vector<ExpressionData> rawTable;
 	Vector<String> selectedItems = new Vector<String>();
 	int totalSampleSize = 0;
 	int numOfshowingDots = 0;
@@ -122,10 +113,13 @@ public class ScatterPlotView extends Widget {
 	Label xMaxLabel = new Label();
 	Label yMaxLabel = new Label();
 
-	//filtering values
+	//filtering
 	List<RowFilter<Object, Object>> tableFilter = new ArrayList<RowFilter<Object, Object>>(4);
 	double smallFilter = log2(0.1);
 	double equalFilter = 1;
+	ArrayList<ExpressionData> dimmingPoints = new ArrayList<ExpressionData>();
+	boolean isAdjusting = false;
+
 
 	//is log scale
 	boolean isLogScale = true;
@@ -139,7 +133,7 @@ public class ScatterPlotView extends Widget {
 	public static void main(String[] argv) {
 		spModel = new ScatterPlotModel();
 		spModel.readTXTData("RPKM.txt", "Feature ID", "RPKM1", "RPKM2", "COG Category");
-
+		rawTable = spModel.getDataTable();
 		ScatterPlotView spView = new ScatterPlotView();
 
 		spView.start();
@@ -393,6 +387,16 @@ public class ScatterPlotView extends Widget {
 		smallTextField.setFocusable(true);
 
 
+		smallSlider.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseReleased(MouseEvent e){
+				isAdjusting = false;
+			}
+			@Override
+			public void mousePressed(MouseEvent e){
+				isAdjusting = true;
+			}
+		});
 		smallSlider.addChangeListener(new ChangeListener(){
 			@Override
 			public void stateChanged(ChangeEvent arg0) {
@@ -419,7 +423,6 @@ public class ScatterPlotView extends Widget {
 				});
 				((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
 				smallTextField.setText(""+me.getValue()/1000.0);
-
 			}
 		});
 
@@ -495,13 +498,26 @@ public class ScatterPlotView extends Widget {
 		equalPanel.add(equalTextField);
 
 
+		equalSlider.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseReleased(MouseEvent e){
+				final JSlider me = (JSlider)e.getSource();
+				me.setToolTipText(""+equalFilter);
+				equalTextField.setText(""+me.getValue()/1000.0);
+				isAdjusting = false;
+			}
+			@Override
+			public void mousePressed(MouseEvent e){
+				isAdjusting = true;
+			}
+		});
 		equalSlider.addChangeListener(new ChangeListener(){
-
 			@Override
 			public void stateChanged(ChangeEvent arg0) {
 				JSlider me = (JSlider)arg0.getSource();
 				equalFilter = me.getValue()/1000.0;
-				me.setToolTipText(""+equalFilter);
+				equalTextField.setText(equalFilter+"");
+				equalSlider.setToolTipText(equalFilter+"");
 				tableFilter.set(1, new RowFilter<Object, Object>(){
 					public boolean include(Entry<? extends Object, ? extends Object> entry) {
 						double x = Double.parseDouble(""+entry.getValue(1));
@@ -514,7 +530,6 @@ public class ScatterPlotView extends Widget {
 					}
 				});
 				((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
-				equalTextField.setText(""+equalFilter);
 			}
 		});
 		equalSlider.setMajorTickSpacing(1000);
@@ -548,7 +563,7 @@ public class ScatterPlotView extends Widget {
 
 	}
 	private void makeColorMap() {
-		int alpha = 100;
+		int alpha = 255;
 		colormap.put("J", new Color(255, 0, 0, alpha));
 		colormap.put("A", new Color(194, 175, 88, alpha));
 		colormap.put("K", new Color(255, 153, 0, alpha));
@@ -601,7 +616,6 @@ public class ScatterPlotView extends Widget {
 				for(int loop = 0; loop < hits ; loop++){
 					int rowIndex = detailTable.convertRowIndexToView(selectBuff.get(loop*4+3));
 					selectedItems.add((String) detailTable.getValueAt(rowIndex, 0));
-					System.out.println(selectedItems.lastElement());
 				}
 				clickedIndex = overedIndex;
 				detailTable.getRowSorter().toggleSortOrder(0);
@@ -643,6 +657,9 @@ public class ScatterPlotView extends Widget {
 		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT|GL11.GL_DEPTH_BUFFER_BIT);
 
 		drawDots();
+		if(isAdjusting){
+			drawDimmingDots();
+		}
 		camera.getInput();
 
 		if(renderMode != GL11.GL_SELECT){
@@ -653,27 +670,66 @@ public class ScatterPlotView extends Widget {
 			else{
 				drawAxis(Math.max(spModel.getMaxX(), spModel.getMaxX()));
 			}
-			drawFilterArea();
+			//drawFilterArea();
 			drawMinMax();
 			drawXYLine();
 		}
+	}
+	private void processFilter(){
+
+	}
+	private boolean isSafe(double x, double y, double small, double equal){
+		if(x >= small && y >= small && Math.max(x, y)/Math.min(x, y) >= equal){
+			return true;
+		}
+		else{
+			return false;
+		}
+	}
+	double[] getAdjustedLocation(ExpressionData data, boolean isLogScale){
+		double x, y;
+		if(isLogScale){
+			x = log2(data.getX()+0.1);
+			y = log2(data.getY()+0.1);
+		}
+		else{
+			x = data.getX();
+			y = data.getY();
+		}
+		 return new double[]{x, y};
+	}
+	private void drawDimmingDots(){
+		for(int i = 0; i < dimmingPoints.size(); i++){
+			ExpressionData data = dimmingPoints.get(i);
+			double[] loc = getAdjustedLocation(data, isLogScale);
+
+			GL11.glPointSize(7);
+			Color categoryColor = getColorByCategory(data.getCategory().toString().substring(0, 1));
+			GL11.glColor4d(categoryColor.getRed()/255.0, categoryColor.getGreen()/255.0, categoryColor.getBlue()/255.0, .1);
+			GL11.glBegin(GL11.GL_POINTS);
+			GL11.glVertex2d(loc[0], loc[1]);
+			GL11.glEnd();
+		}
+
+		dimmingPoints.clear();
+
 	}
 	private void drawDots() {
 		GL11.glInitNames();
 
 
+
 		for(int i = 0; i < totalSampleSize; i++){
-			if(detailTable.convertRowIndexToView(i) == -1)
-				continue;//i is not shown
-			double x, y;
-			if(isLogScale){
-				x = Math.log((Double)detailTable.getModel().getValueAt(i, 1)+0.1)/Math.log(2);
-				y = Math.log((Double)detailTable.getModel().getValueAt(i, 2)+0.1)/Math.log(2);
+			ExpressionData data = rawTable.get(i);
+
+			double[] xy = getAdjustedLocation(data, isLogScale);
+
+			if(detailTable.convertRowIndexToView(i) < 0){
+				dimmingPoints.add(data);
+				continue;
 			}
-			else{
-				x = (Double)detailTable.getModel().getValueAt(i, 1);
-				y = (Double)detailTable.getModel().getValueAt(i, 2);
-			}
+
+
 
 			GL11.glPushName(i);
 
@@ -681,15 +737,15 @@ public class ScatterPlotView extends Widget {
 				GL11.glPointSize(14);
 				GL11.glColor3f(0, 0, 0);
 				GL11.glBegin(GL11.GL_POINTS);
-				GL11.glVertex3d(x, y, 0.5);
+				GL11.glVertex3d(xy[0], xy[1], 0.5);
 				GL11.glEnd();
 			}
 			else{
 				GL11.glPointSize(7);
 				Color categoryColor = getColorByCategory(detailTable.getModel().getValueAt(i, 3).toString().substring(0, 1));
-				GL11.glColor4d(categoryColor.getRed()/255.0, categoryColor.getGreen()/255.0, categoryColor.getBlue()/255.0, categoryColor.getAlpha()/255.0);
+				GL11.glColor4d(categoryColor.getRed()/255.0, categoryColor.getGreen()/255.0, categoryColor.getBlue()/255.0, data.alpha);
 				GL11.glBegin(GL11.GL_POINTS);
-				GL11.glVertex2d(x, y);
+				GL11.glVertex2d(xy[0], xy[1]);
 				GL11.glEnd();
 			}
 			GL11.glPopName();

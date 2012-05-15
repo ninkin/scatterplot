@@ -5,6 +5,9 @@ import javax.swing.JLabel;
 
 
 public class ExpressionData extends Vector<Object>{
+	public boolean isDimming = false;
+	final double DEFAULT_ALPHA = 0.8;
+	public double alpha = DEFAULT_ALPHA;
 	public ExpressionData(String name, double x, double y, String category){
 		this.add(name);
 		this.add(x);
