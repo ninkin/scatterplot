@@ -158,7 +158,7 @@ public class ScatterPlotView extends Widget {
 	}
 	public void start() {
 		updateMaxXY();
-		camera = new Camera(-maxXY/10, 1.1*maxXY, -maxXY/10, 1.1*maxXY, 1, -1);
+		camera = new Camera(-maxXY/10, 1.1*maxXY, -maxXY/10, 1.1*maxXY, -10, 10);
 		initLayout();
 		try {
 			canvas.setVisible(true);
@@ -339,6 +339,7 @@ public class ScatterPlotView extends Widget {
 				JCheckBox me = (JCheckBox)e.getSource();
 				isLogScale = me.isSelected();
 				updateMaxXY();
+				camera.setCamera(-maxXY/10, 1.1*maxXY, -maxXY/10, 1.1*maxXY, -10, 10);
 			}
 		});
 		rightPanel.add(scaleCheckBox);
@@ -346,7 +347,7 @@ public class ScatterPlotView extends Widget {
 
 		JPanel smallSliderPanel = new JPanel();
 		JLabel smallFilterLabel = new JLabel("RPKM Filter");
-		final JTextField smallTextField = new JTextField(3);
+		final JTextField smallTextField = new JTextField();
 		final JSlider smallSlider = new JSlider();
 		if(isLogScale){
 			smallSlider.setMaximum((int)(Math.log(spModel.getMax()+.1)/Math.log(2)*1000));
@@ -436,13 +437,9 @@ public class ScatterPlotView extends Widget {
 				  }
 				});*/
 		Hashtable<Integer, JLabel> labelTable = new Hashtable<Integer, JLabel>();
-		labelTable.put(new Integer(-1000), new JLabel("-1.0"));
-		labelTable.put(new Integer(0), new JLabel("0.0"));
-		labelTable.put(new Integer(1000), new JLabel("1.0"));
-		labelTable.put(new Integer(2000), new JLabel("2.0"));
-		labelTable.put(new Integer(3000), new JLabel("3.0"));
-		labelTable.put(new Integer(4000), new JLabel("4.0"));
-		labelTable.put(new Integer(5000), new JLabel("5.0"));
+		for(int i = -4; i < 1000; i ++){
+			labelTable.put(new Integer(i*1000), new JLabel(i+""));
+		}
 
 		smallSlider.setLabelTable(labelTable);
 		smallSlider.setPreferredSize(new Dimension(280, 40));
@@ -660,12 +657,12 @@ public class ScatterPlotView extends Widget {
 		if(isAdjusting){
 			drawDimmingDots();
 		}
+		dimmingPoints.clear();
 		camera.getInput();
 
 		if(renderMode != GL11.GL_SELECT){
-			//drawShadows();
 			if(isLogScale){
-				drawAxis(Math.log(Math.max(spModel.getMaxX(), spModel.getMaxX()))/Math.log(2));
+				drawAxis(log2(Math.max(spModel.getMaxX(), spModel.getMaxX())));
 			}
 			else{
 				drawAxis(Math.max(spModel.getMaxX(), spModel.getMaxX()));
@@ -673,17 +670,6 @@ public class ScatterPlotView extends Widget {
 			//drawFilterArea();
 			drawMinMax();
 			drawXYLine();
-		}
-	}
-	private void processFilter(){
-
-	}
-	private boolean isSafe(double x, double y, double small, double equal){
-		if(x >= small && y >= small && Math.max(x, y)/Math.min(x, y) >= equal){
-			return true;
-		}
-		else{
-			return false;
 		}
 	}
 	double[] getAdjustedLocation(ExpressionData data, boolean isLogScale){
@@ -711,7 +697,6 @@ public class ScatterPlotView extends Widget {
 			GL11.glEnd();
 		}
 
-		dimmingPoints.clear();
 
 	}
 	private void drawDots() {
@@ -728,6 +713,7 @@ public class ScatterPlotView extends Widget {
 				dimmingPoints.add(data);
 				continue;
 			}
+
 
 
 

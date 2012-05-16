@@ -32,6 +32,14 @@ public class Camera {
 		this.near_plane = near_plane;
 		this.far_plane = far_plane;
 	}
+	public void setCamera(double left_plane, double right_plane, double bottom_plane, double top_plane, double near_plane, double far_plane){
+		this.left_plane = left_plane;
+		this.right_plane = right_plane;
+		this.bottom_plane = bottom_plane;
+		this.top_plane = top_plane;
+		this.near_plane = near_plane;
+		this.far_plane = far_plane;
+	}
 
 	public void getInput(){
 
