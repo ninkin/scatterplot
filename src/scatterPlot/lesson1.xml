@@ -10,6 +10,7 @@
         <area name="-frameF" xywh="50,0,9,9" splitx="L3,R3" splity="T3,B3"/>
         <area name="-frameG" xywh="60,0,9,9" splitx="L3,R3" splity="T3,B3"/>
         <area name="-frameH" xywh="70,0,9,9" splitx="L3,R3" splity="T3,B3"/>
+        <area name="white" xywh="23,3,1,1"/>
 
         <select name="button.background">
             <alias ref="-frameB" if="disabled" tint="#8fff"/>
@@ -52,5 +53,23 @@
         <theme name="bigLabel" ref="-defaults">
             <param name="font"><font>big</font></param>
         </theme>
+        <theme name="tooltipwindow" ref="-defaults">
+        </theme>
+    
+   </theme>
+    <theme name="menumanager" ref="-defaults">
+        <theme name="menupopup" ref="-defaults">
+            <param name="smallGap"><dimension>0,0</dimension></param>
+            <param name="mediumGap"><dimension>0,0</dimension></param>
+            <param name="largeGap"><dimension>0,0</dimension></param>
+            <param name="defaultGap"><dimension>0,0</dimension></param>
+        
+            <theme name="button" ref="-defaults"/>
+            <param name="namedGaps">
+                <map>
+                </map>
+            </param>
+        </theme>
     </theme>
+
 </themes>
