@@ -31,6 +31,7 @@ public class Option {
 		panel.add(showTickCheck);
 
 		final IntegerTextField intervalField = new IntegerTextField();
+		intervalField.setHorizontalAlignment(JTextField.RIGHT);
 		intervalField.setText(tickInterval+"");
 		intervalField.setPreferredSize(new Dimension(100, 20));
 

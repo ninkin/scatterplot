@@ -19,6 +19,8 @@
         </select>
     </images>
     <fontDef name="big" filename="big.fnt" color="#000000"/>
+    <fontDef name="outlined" filename="outlined.fnt"/>
+
 
     <fontDef name="normal" filename="font.fnt" color="black">
         <fontParam if="error" color="red"/>
@@ -50,8 +52,7 @@
 
     <theme name="scatterplotview" ref="-defaults">
     	<theme name="faketooltip" ref="-defaults">
-    		<param name="background"><image>-frameH</image></param>
-    		<param name="border"><border>3</border></param>
+            <param name="font"><font>outlined</font></param>
     	</theme>
         <theme name="label" ref="-defaults">
             <param name=""><image>label.*</image></param>
@@ -64,19 +65,4 @@
         </theme>
 
    </theme>
-    <theme name="menumanager" ref="-defaults">
-        <theme name="menupopup" ref="-defaults">
-            <param name="smallGap"><dimension>0,0</dimension></param>
-            <param name="mediumGap"><dimension>0,0</dimension></param>
-            <param name="largeGap"><dimension>0,0</dimension></param>
-            <param name="defaultGap"><dimension>0,0</dimension></param>
-
-            <theme name="button" ref="-defaults"/>
-            <param name="namedGaps">
-                <map>
-                </map>
-            </param>
-        </theme>
-    </theme>
-
 </themes>

@@ -4,6 +4,7 @@ import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.TextField;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
@@ -230,7 +231,7 @@ public class ScatterPlotView extends Widget {
             themeManager = ThemeManager.createThemeManager(getClass().getResource("simple.xml"), renderer);
             gui.applyTheme(themeManager);
             toolTipBox.setAutoSize(true);
-            toolTipBox.setTheme("label");
+            toolTipBox.setTheme("faketooltip");
             toolTipBox.setBorderSize(1);
             xAxisLabel.setTheme("bigLabel");
             yAxisLabel.setTheme("bigLabel");
@@ -376,6 +377,7 @@ public class ScatterPlotView extends Widget {
 		 * Small Text Field
 		 */
 		smallTextField.setPreferredSize(new Dimension(100, 20));
+		smallTextField.setHorizontalAlignment(JTextField.RIGHT);
 		smallTextField.addKeyListener(new KeyAdapter(){
 			public void processKeyEvent(KeyEvent e){
 
@@ -485,6 +487,7 @@ public class ScatterPlotView extends Widget {
 		 * Equal Text Field
 		 */
 		equalTextField.setPreferredSize(new Dimension(100, 20));
+		equalTextField.setHorizontalAlignment(JTextField.RIGHT);
 		equalTextField.addKeyListener(new KeyAdapter(){
 			public void keyPressed(KeyEvent e){
 				int key = e.getKeyCode();
@@ -698,7 +701,7 @@ public class ScatterPlotView extends Widget {
 			else{
 				overedIndex = choose;
 			}
-			toolTipBox.setText(data.getName()+" ("+data.getX()+", "+data.getY()+")");
+			toolTipBox.setText(String.format("%s (%.2f, %.2f)",data.getName(), data.getX(), data.getY()));
 		}
 		else{
 			overedIndex = -1;
@@ -868,7 +871,7 @@ public class ScatterPlotView extends Widget {
 			GL11.glVertex2d(0, maxXY*1.1);
 			GL11.glEnd();
 			GL11.glLineWidth(1);
-			GL11.glColor4d(0, 0, 0, 0.2);
+			GL11.glColor4d(0, 0, 0, 0.1);
 			GL11.glBegin(GL11.GL_LINES);
 			if(Option.showTick){
 				for(double i = 0; i < spModel.getMax()*1.1; i = i + Option.tickInterval){
@@ -894,7 +897,7 @@ public class ScatterPlotView extends Widget {
 			GL11.glVertex2d(0, maxXY*1.1);
 			GL11.glEnd();
 			GL11.glLineWidth(1);
-			GL11.glColor4d(0, 0, 0, 0.2);
+			GL11.glColor4d(0, 0, 0, 0.1);
 			GL11.glBegin(GL11.GL_LINES);
 			if(Option.showTick){
 				for(double i = 0; i < maxXY*1.1; i = i + Option.tickInterval){
