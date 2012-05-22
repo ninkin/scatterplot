@@ -227,7 +227,7 @@ public class ScatterPlotView extends Widget {
 		try {
 			renderer = new LWJGLRenderer();
 			GUI gui = new GUI(this, renderer);
-            themeManager = ThemeManager.createThemeManager(getClass().getResource("lesson1.xml"), renderer);
+            themeManager = ThemeManager.createThemeManager(getClass().getResource("simple.xml"), renderer);
             gui.applyTheme(themeManager);
             toolTipBox.setAutoSize(true);
             toolTipBox.setTheme("label");
@@ -598,6 +598,19 @@ public class ScatterPlotView extends Widget {
 
 		menuBar.add(cameraMenu);
 
+		JMenu optionMenu = new JMenu("Option");
+		JMenuItem option = new JMenuItem("Option");
+		option.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				// TODO Auto-generated method stub
+				new Option();
+			}
+		});
+		optionMenu.add(option);
+		menuBar.add(optionMenu);
+
 		mainFrame.setJMenuBar(menuBar);
 	}
 	private void initOpenGL() {
@@ -854,6 +867,22 @@ public class ScatterPlotView extends Widget {
 			GL11.glVertex2d(0, -maxXY*1.1);
 			GL11.glVertex2d(0, maxXY*1.1);
 			GL11.glEnd();
+			GL11.glLineWidth(1);
+			GL11.glColor4d(0, 0, 0, 0.2);
+			GL11.glBegin(GL11.GL_LINES);
+			if(Option.showTick){
+				for(double i = 0; i < spModel.getMax()*1.1; i = i + Option.tickInterval){
+					GL11.glVertex2d(log2(i), -maxXY);
+					GL11.glVertex2d(log2(i), maxXY);
+					GL11.glVertex2d(-maxXY, log2(i));
+					GL11.glVertex2d(maxXY, log2(i));
+					GL11.glVertex2d(-log2(i), -maxXY);
+					GL11.glVertex2d(-log2(i), maxXY);
+					GL11.glVertex2d(-maxXY, -log2(i));
+					GL11.glVertex2d(maxXY, -log2(i));
+				}
+			}
+			GL11.glEnd();
 		}
 		else{
 			GL11.glLineWidth(2);
@@ -863,6 +892,18 @@ public class ScatterPlotView extends Widget {
 			GL11.glVertex2d(maxXY*1.1, 0);
 			GL11.glVertex2d(0, 0);
 			GL11.glVertex2d(0, maxXY*1.1);
+			GL11.glEnd();
+			GL11.glLineWidth(1);
+			GL11.glColor4d(0, 0, 0, 0.2);
+			GL11.glBegin(GL11.GL_LINES);
+			if(Option.showTick){
+				for(double i = 0; i < maxXY*1.1; i = i + Option.tickInterval){
+					GL11.glVertex2d(i, 0);
+					GL11.glVertex2d(i, maxXY*1.1);
+					GL11.glVertex2d(0, i);
+					GL11.glVertex2d(maxXY*1.1, i);
+				}
+			}
 			GL11.glEnd();
 		}
 
@@ -962,21 +1003,6 @@ public class ScatterPlotView extends Widget {
 		GL11.glEnd();
 
 
-	}
-	class IntegerTextField extends JTextField {
-		final static String badchars
-		= "`~!@#$%^&*()[]{}_+=\\|\"':;?/>.<, ";
-		public void processKeyEvent(KeyEvent ev) {
-			char c = ev.getKeyChar();
-			if((Character.isLetter(c) && !ev.isAltDown())
-					|| badchars.indexOf(c) > -1) {
-				ev.consume();
-				return;
-			}
-			if(c == '-' && getDocument().getLength() > 0)
-				ev.consume();
-			else super.processKeyEvent(ev);
-		}
 	}
 }
 
