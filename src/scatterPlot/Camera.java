@@ -55,6 +55,12 @@ public class Camera {
 		this.bottom_plane_max = bottom_plane;
 		this.top_plane_max = top_plane;
 	}
+	public void resetCamera(){
+		left_plane = left_plane_max;
+		right_plane = right_plane_max;
+		bottom_plane = bottom_plane_max;
+		top_plane = top_plane_max;
+	}
 
 	public void getInput(){
 

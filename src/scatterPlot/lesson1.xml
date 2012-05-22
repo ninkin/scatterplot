@@ -44,8 +44,15 @@
         <param name="maxHeight"><int>0</int></param>
         <param name="inputMap"><inputMap>-defaultInputMap</inputMap></param>
     </theme>
+    <theme name="tooltipwindow" ref="-defaults">
+		<param name="fadeInTime"><int>0</int></param>
+    </theme>
 
     <theme name="scatterplotview" ref="-defaults">
+    	<theme name="faketooltip" ref="-defaults">
+    		<param name="background"><image>-frameH</image></param>
+    		<param name="border"><border>3</border></param>
+    	</theme>
         <theme name="label" ref="-defaults">
             <param name=""><image>label.*</image></param>
             <param name="font"><font>normal</font></param>
@@ -55,7 +62,7 @@
         </theme>
         <theme name="tooltipwindow" ref="-defaults">
         </theme>
-    
+
    </theme>
     <theme name="menumanager" ref="-defaults">
         <theme name="menupopup" ref="-defaults">
@@ -63,7 +70,7 @@
             <param name="mediumGap"><dimension>0,0</dimension></param>
             <param name="largeGap"><dimension>0,0</dimension></param>
             <param name="defaultGap"><dimension>0,0</dimension></param>
-        
+
             <theme name="button" ref="-defaults"/>
             <param name="namedGaps">
                 <map>

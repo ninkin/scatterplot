@@ -8,6 +8,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -584,6 +586,14 @@ public class ScatterPlotView extends Widget {
 		JMenu cameraMenu = new JMenu("Camera");
 		JMenuItem resetCamera = new JMenuItem("Reset camera", KeyEvent.VK_R);
 		resetCamera.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, ActionEvent.ALT_MASK));
+		resetCamera.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				// TODO Auto-generated method stub
+				camera.resetCamera();
+			}
+		});
 		cameraMenu.add(resetCamera);
 
 		menuBar.add(cameraMenu);
@@ -708,14 +718,14 @@ public class ScatterPlotView extends Widget {
 
 		if(renderMode != GL11.GL_SELECT){
 			if(isLogScale){
-				drawAxis(log2(Math.max(spModel.getMaxX(), spModel.getMaxX())));
+				drawAxis(log2(Math.max(spModel.getMaxX(), spModel.getMaxX())), isLogScale);
 			}
 			else{
-				drawAxis(Math.max(spModel.getMaxX(), spModel.getMaxX()));
+				drawAxis(Math.max(spModel.getMaxX(), spModel.getMaxX()), isLogScale);
 			}
 			//drawFilterArea();
 			drawMinMax();
-			drawXYLine();
+			drawXYLine(isLogScale);
 		}
 	}
 	double[] getAdjustedLocation(ExpressionData data, boolean isLogScale){
@@ -790,12 +800,21 @@ public class ScatterPlotView extends Widget {
 
 	}
 
-	private void drawXYLine(){
-		GL11.glLineWidth(2);
-		GL11.glBegin(GL11.GL_LINES);
-		GL11.glVertex2d(0, 0);
-		GL11.glVertex2d(maxXY, maxXY);
-		GL11.glEnd();
+	private void drawXYLine(boolean isLogScale){
+		if(isLogScale){
+			GL11.glLineWidth(2);
+			GL11.glBegin(GL11.GL_LINES);
+			GL11.glVertex2d(-maxXY, -maxXY);
+			GL11.glVertex2d(maxXY, maxXY);
+			GL11.glEnd();
+		}
+		else{
+			GL11.glLineWidth(2);
+			GL11.glBegin(GL11.GL_LINES);
+			GL11.glVertex2d(0, 0);
+			GL11.glVertex2d(maxXY, maxXY);
+			GL11.glEnd();
+		}
 		int [] pos = getBoundary(maxXY, maxXY, 0);
 		xyLabel.setPosition(pos[0]-50, pos[1]+50);
 
@@ -825,15 +844,27 @@ public class ScatterPlotView extends Widget {
 
 		return coord;
 	}
-	private void drawAxis(double maxXY) {
-		GL11.glLineWidth(2);
-		GL11.glColor3d(0, 0, 0);
-		GL11.glBegin(GL11.GL_LINES);
-		GL11.glVertex2d(0, 0);
-		GL11.glVertex2d(maxXY*1.1, 0);
-		GL11.glVertex2d(0, 0);
-		GL11.glVertex2d(0, maxXY*1.1);
-		GL11.glEnd();
+	private void drawAxis(double maxXY, boolean isLogScale) {
+		if(isLogScale){
+			GL11.glLineWidth(2);
+			GL11.glColor3d(0, 0, 0);
+			GL11.glBegin(GL11.GL_LINES);
+			GL11.glVertex2d(-maxXY*1.1, 0);
+			GL11.glVertex2d(maxXY*1.1, 0);
+			GL11.glVertex2d(0, -maxXY*1.1);
+			GL11.glVertex2d(0, maxXY*1.1);
+			GL11.glEnd();
+		}
+		else{
+			GL11.glLineWidth(2);
+			GL11.glColor3d(0, 0, 0);
+			GL11.glBegin(GL11.GL_LINES);
+			GL11.glVertex2d(0, 0);
+			GL11.glVertex2d(maxXY*1.1, 0);
+			GL11.glVertex2d(0, 0);
+			GL11.glVertex2d(0, maxXY*1.1);
+			GL11.glEnd();
+		}
 
 		int xpos[] = getBoundary(maxXY*1.15, 0, 0);
 		int ypos[] = getBoundary(0, maxXY*1.15, 0);
