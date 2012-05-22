@@ -17,8 +17,8 @@ import javax.swing.event.ChangeListener;
 
 
 public class Option {
-	static boolean showTick = true;
-	static double tickInterval = 100;
+	static boolean showTick = false;
+	static double tickInterval = 1000;
 	public Option(){
 		final JFrame optionFrame = new JFrame();
 		JPanel panel = new JPanel();
