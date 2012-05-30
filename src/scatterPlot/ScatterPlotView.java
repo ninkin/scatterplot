@@ -625,6 +625,7 @@ public class ScatterPlotView extends Widget {
 
 		GL11.glEnable(GL11.GL_NORMALIZE);
 
+
 		GL11.glEnable(GL11.GL_POINT_SMOOTH);
 		GL11.glEnable(GL11.GL_BLEND);
 		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
@@ -773,8 +774,7 @@ public class ScatterPlotView extends Widget {
 	}
 	private void drawDots() {
 		GL11.glInitNames();
-
-
+		Vector<Integer> drawOnTop = new Vector<Integer>();
 
 		for(int i = 0; i < totalSampleSize; i++){
 			ExpressionData data = rawTable.get(i);
@@ -786,26 +786,31 @@ public class ScatterPlotView extends Widget {
 				continue;
 			}
 
-
-
-
-			GL11.glPushName(i);
-
 			if(overedIndex == i||clickedIndex == i){
-				GL11.glPointSize(14);
-				GL11.glColor3f(0, 0, 0);
-				GL11.glBegin(GL11.GL_POINTS);
-				GL11.glVertex3d(xy[0], xy[1], 0.5);
-				GL11.glEnd();
+				drawOnTop.add(i);
+				continue;
 			}
 			else{
+				GL11.glPushName(i);
 				GL11.glPointSize(7);
 				Color categoryColor = getColorByCategory(detailTable.getModel().getValueAt(i, 3).toString().substring(0, 1));
 				GL11.glColor4d(categoryColor.getRed()/255.0, categoryColor.getGreen()/255.0, categoryColor.getBlue()/255.0, data.alpha);
 				GL11.glBegin(GL11.GL_POINTS);
 				GL11.glVertex2d(xy[0], xy[1]);
 				GL11.glEnd();
+				GL11.glPopName();
 			}
+		}
+		//because we enable alpha blending and z buffering
+		for(Integer i : drawOnTop){
+			ExpressionData data = rawTable.get(i);
+			double[] xy = getAdjustedLocation(data, isLogScale);
+			GL11.glPushName(i);
+			GL11.glPointSize(14);
+			GL11.glColor3f(0, 0, 0);
+			GL11.glBegin(GL11.GL_POINTS);
+			GL11.glVertex3d(xy[0], xy[1], 0);
+			GL11.glEnd();
 			GL11.glPopName();
 		}
 
