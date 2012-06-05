@@ -4,6 +4,9 @@ import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.TextField;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -17,12 +20,15 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.geom.Rectangle2D;
 import java.io.IOException;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -228,7 +234,7 @@ public class ScatterPlotView extends Widget {
 		try {
 			renderer = new LWJGLRenderer();
 			GUI gui = new GUI(this, renderer);
-            themeManager = ThemeManager.createThemeManager(getClass().getResource("simple.xml"), renderer);
+            themeManager = ThemeManager.createThemeManager(getClass().getResource("resources/simple.xml"), renderer);
             gui.applyTheme(themeManager);
             toolTipBox.setAutoSize(true);
             toolTipBox.setTheme("faketooltip");
@@ -350,6 +356,41 @@ public class ScatterPlotView extends Widget {
 		});
 		rightPanel.add(scaleCheckBox);
 
+		JPanel a = new JPanel(){
+			public void paintComponent(Graphics g){
+				super.paintComponent(g);
+				g.setColor(Color.green);
+				g.fillRect(0, 0, 10, 10);
+				this.getHeight();
+
+				Iterator<Entry<String, Category>> categoriesSet = spModel.catetories.entrySet().iterator();
+				System.out.println(spModel.catetories.size());
+				while(categoriesSet.hasNext()){
+					Category category = categoriesSet.next().getValue();
+					System.out.println(category.category +":"+ category.data.size());
+				}
+			}
+		};
+		a.setBackground(Color.white);
+		a.addMouseListener(new MouseAdapter(){
+			@Override
+			public void mouseClicked(MouseEvent e) {
+				super.mouseClicked(e);
+				System.out.println(e.getX());
+				System.out.println(e.getY());
+			};
+			@Override
+			public void mouseMoved(MouseEvent e) {
+				// TODO Auto-generated method stub
+				super.mouseMoved(e);
+				System.out.println(e.getX());
+				System.out.println(e.getY());
+
+			}
+		});
+		a.setPreferredSize(new Dimension(200, 100));
+
+		rightPanel.add(a);
 
 		JPanel smallSliderPanel = new JPanel();
 		JLabel smallFilterLabel = new JLabel("RPKM Filter");

@@ -1,18 +1,9 @@
 package scatterPlot;
-import java.beans.Expression;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Vector;
 
 
@@ -23,6 +14,8 @@ public class ScatterPlotModel {
 	private double minY = Double.MAX_VALUE;
 	private double maxY = Double.MIN_VALUE;
 	private double maxA = Double.MIN_VALUE;
+	public HashMap<String, Category> catetories = new HashMap<String, Category>();
+	public HashMap<String, Category> biggerCategoties = new HashMap<String, Category>();
 
 	public Vector<ExpressionData> getDataTable(){
 		return dataTable;
@@ -141,7 +134,22 @@ public class ScatterPlotModel {
 				String name = tokens[indexID];
 				double x = Double.parseDouble(tokens[indexRPKM1]);
 				double y = Double.parseDouble(tokens[indexRPKM2]);
-				String category = tokens[indexCategory];
+				Category category = catetories.get(tokens[indexCategory]);
+				if(category == null){
+					category = new Category();
+					category.category = tokens[indexCategory];
+				}
+				catetories.put(tokens[indexCategory], category);
+
+				Category category2 = biggerCategoties.get(tokens[indexCategory].substring(0, 1));
+				if(category2 == null){
+					category2 = new Category();
+					category2.category = tokens[indexCategory].substring(0, 1);
+				}
+				biggerCategoties.put(tokens[indexCategory].substring(0, 1), category2);
+
+
+
 				if(x < minX && x != 0){
 					minX = x;
 				}
@@ -159,6 +167,8 @@ public class ScatterPlotModel {
 				}
 
 				ExpressionData newData = new ExpressionData(name, x, y, category);
+				category2.addData(newData);
+				category.addData(newData);
 				dataTable.add(newData);
 			}
 
