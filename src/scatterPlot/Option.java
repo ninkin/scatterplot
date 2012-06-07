@@ -22,7 +22,7 @@ public class Option {
 	public Option(){
 		final JFrame optionFrame = new JFrame();
 		JPanel panel = new JPanel();
-		optionFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		optionFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
 
 

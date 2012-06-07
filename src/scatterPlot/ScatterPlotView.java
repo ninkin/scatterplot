@@ -20,6 +20,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.IOException;
 import java.nio.IntBuffer;
@@ -55,6 +56,7 @@ import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
+import org.lwjgl.input.Cursor;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
@@ -65,6 +67,15 @@ import de.matthiasmann.twl.Label;
 import de.matthiasmann.twl.Widget;
 import de.matthiasmann.twl.renderer.lwjgl.LWJGLRenderer;
 import de.matthiasmann.twl.theme.ThemeManager;
+import edu.umd.cs.piccolo.PCamera;
+import edu.umd.cs.piccolo.PCanvas;
+import edu.umd.cs.piccolo.PNode;
+import edu.umd.cs.piccolo.event.PBasicInputEventHandler;
+import edu.umd.cs.piccolo.event.PInputEvent;
+import edu.umd.cs.piccolo.event.PInputEventListener;
+import edu.umd.cs.piccolo.nodes.PPath;
+import edu.umd.cs.piccolo.nodes.PText;
+import edu.umd.cs.piccolox.util.PFixedWidthStroke;
 
 public class ScatterPlotView extends Widget {
 	// UI initialize
@@ -163,6 +174,7 @@ public class ScatterPlotView extends Widget {
 		updateMinXY();
 		double margin = (maxXY - minXY)/20.0;
 		camera = new Camera(minXY - margin, maxXY + margin, minXY - margin, maxXY + margin, -10, 10);
+		makeColorMap();
 		initLayout();
 		try {
 			canvas.setVisible(true);
@@ -191,7 +203,6 @@ public class ScatterPlotView extends Widget {
 
 			GUI gui = initTWL();
 			initOpenGL();
-			makeColorMap();
 			initFilters();
 
 			LWJGLRenderer renderer = new LWJGLRenderer();
@@ -356,41 +367,99 @@ public class ScatterPlotView extends Widget {
 		});
 		rightPanel.add(scaleCheckBox);
 
-		JPanel a = new JPanel(){
-			public void paintComponent(Graphics g){
-				super.paintComponent(g);
-				g.setColor(Color.green);
-				g.fillRect(0, 0, 10, 10);
-				this.getHeight();
+		PCanvas histogramView = new PCanvas();
 
-				Iterator<Entry<String, Category>> categoriesSet = spModel.catetories.entrySet().iterator();
-				System.out.println(spModel.catetories.size());
-				while(categoriesSet.hasNext()){
-					Category category = categoriesSet.next().getValue();
-					System.out.println(category.category +":"+ category.data.size());
-				}
+		histogramView.setPanEventHandler(null);
+
+
+		final PText tooltipNode = new PText();
+		final PCamera pcamera = histogramView.getCamera();
+
+		tooltipNode.setPickable(false);
+		pcamera.addChild(tooltipNode);
+
+		pcamera.addInputEventListener(new PBasicInputEventHandler(){
+			public void mouseMoved(PInputEvent event){
+				updateToolTip(event);
 			}
-		};
-		a.setBackground(Color.white);
-		a.addMouseListener(new MouseAdapter(){
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				super.mouseClicked(e);
-				System.out.println(e.getX());
-				System.out.println(e.getY());
-			};
-			@Override
-			public void mouseMoved(MouseEvent e) {
-				// TODO Auto-generated method stub
-				super.mouseMoved(e);
-				System.out.println(e.getX());
-				System.out.println(e.getY());
+			public void mouseDragged(PInputEvent event){
+				updateToolTip(event);
+			}
+			public void updateToolTip(PInputEvent event){
+				PNode n = event.getInputManager().getMouseOver().getPickedNode();
+				String name = (String)n.getAttribute("name");
+				Point2D p = event.getCanvasPosition();
+
+
+				event.getPath().canvasToLocal(p, pcamera);
+				tooltipNode.setText(name);
+				tooltipNode.setOffset(p.getX() + 8, p.getY() - 8);
 
 			}
 		});
-		a.setPreferredSize(new Dimension(200, 100));
 
-		rightPanel.add(a);
+		histogramView.setPreferredSize(new Dimension(getWidth(), 200));
+		Iterator<Entry<String, Category>> categoriesSet = spModel.biggerCategoties.entrySet().iterator();
+		int categoryWidth = 20;
+		int x = categoryWidth;
+		while(categoriesSet.hasNext()){
+			final Category category = categoriesSet.next().getValue();
+			PNode categoryNode = PPath.createRectangle(x, 100-category.data.size()/50, categoryWidth, category.data.size()/50);
+			final PText categoryText = new PText(category.category);
+			final PText categoryValue = new PText(category.data.size()+"");
+
+
+			categoryNode.addAttribute("name", category.category);
+			categoryNode.setPaint(getColorByCategory(category.category));
+			categoryText.setOffset(x+categoryWidth/2-categoryText.getWidth()/2, 100);
+			categoryText.setPickable(false);
+			categoryValue.setScale(0.8);
+			categoryValue.setOffset(x+categoryWidth/2-categoryValue.getWidth()/2, 100 - category.data.size()/50-categoryValue.getHeight());
+			categoryValue.setTextPaint(Color.gray);
+			categoryValue.setPickable(false);
+
+			categoryNode.addInputEventListener(new PBasicInputEventHandler(){
+				public void mousePressed(PInputEvent event){
+					super.mousePressed(event);
+					category.toggleActivation();
+					if(category.isActivated){
+						event.getPickedNode().setPaint(getColorByCategory(category.category));
+					}
+					else{
+						event.getPickedNode().setPaint(Color.WHITE);
+					}
+					tableFilter.add(2, new RowFilter<Object, Object>(){
+						public boolean include(Entry<? extends Object, ? extends Object> entry) {
+							String categoryName = ((Category)entry.getValue(3)).category.substring(0,1);
+							if(spModel.biggerCategoties.get(categoryName).isActivated)
+								return true;
+							else
+								return false;
+						}
+					});
+					((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
+				}
+				public void mouseEntered(PInputEvent event){
+					super.mouseEntered(event);
+					((PText)event.getPickedNode().getChild(1)).setTextPaint(Color.black);
+					java.awt.Cursor a= new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR);
+					event.pushCursor(a);
+				}
+				public void mouseExited(PInputEvent event){
+					super.mouseExited(event);
+					((PText)event.getPickedNode().getChild(1)).setTextPaint(Color.gray);
+					event.popCursor();
+				}
+			});
+
+			histogramView.getLayer().addChild(categoryNode);
+			categoryNode.addChild(categoryText);
+			categoryNode.addChild(categoryValue);
+			x += categoryWidth*1.1;
+		}
+
+		rightPanel.add(histogramView);
+
 
 		JPanel smallSliderPanel = new JPanel();
 		JLabel smallFilterLabel = new JLabel("RPKM Filter");
@@ -608,7 +677,7 @@ public class ScatterPlotView extends Widget {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				// TODO Auto-generated method stub
-				System.out.println("cool");
+				new FileOpenDialog();
 			}
 
 		});
@@ -857,6 +926,9 @@ public class ScatterPlotView extends Widget {
 
 	}
 	private Color getColorByCategory(String category){
+		if(category.length() > 1){
+			category = category.substring(0, 1);
+		}
 
 		return colormap.get(category);
 
