@@ -168,17 +168,17 @@ public class ScatterPlotView extends Widget{
 		smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
 		smallSlider.setValue(smallSlider.getMinimum());
 		TableModel detailTableModel = new NonEditableTableModel(spModel.getDataTable(), spModel.getColumnNames());
-		detailTable = new JTable(detailTableModel);
-		totalSampleSize = detailTable.getRowCount();
+		totalSampleSize = detailTableModel.getRowCount();
+		detailTable.setModel(detailTableModel);
 		detailTable.setRowSorter(getRowSorter(detailTable));
 		((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
 		for(Component c : rightPanel.getComponents()){
 			if(c instanceof PCanvas){
 				rightPanel.remove(c);
 				rightPanel.add(getHistogram());
-				rightPanel.repaint();
 			}
 		}
+		rightPanel.revalidate();
 
 }
 
@@ -380,14 +380,14 @@ public class ScatterPlotView extends Widget{
 		});
 		rightPanel.add(scaleCheckBox);
 
-		PCanvas histogramView = getHistogram();
-		rightPanel.add(histogramView);
-
 		JPanel smallFilterPanel = getSmallFilterPanel(scaleCheckBox);
 		rightPanel.add(smallFilterPanel);
 
 		JPanel equalPanel = getEqualFilterPanel();
 		rightPanel.add(equalPanel);
+
+		PCanvas histogramView = getHistogram();
+		rightPanel.add(histogramView);
 	}
 	private TableRowSorter<TableModel> getRowSorter(JTable table) {
 		TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(table.getModel());
@@ -928,7 +928,7 @@ public class ScatterPlotView extends Widget{
 		GL11.glInitNames();
 		Vector<Integer> drawOnTop = new Vector<Integer>();
 
-		for(int i = 0; i < detailTable.getRowCount(); i++){
+		for(int i = 0; i < totalSampleSize; i++){
 			ExpressionData data = rawTable.get(i);
 
 			double[] xy = getAdjustedLocation(data, isLogScale);
