@@ -4,7 +4,9 @@ import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.FileDialog;
 import java.awt.FlowLayout;
+import java.awt.Frame;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
@@ -24,6 +26,7 @@ import java.awt.event.WindowEvent;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
@@ -44,6 +47,7 @@ import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSlider;
 import javax.swing.JTable;
@@ -351,15 +355,53 @@ public class ScatterPlotView extends Widget{
 
 		detailTable = new JTable(detailTableModel);
 
+		final JPopupMenu popup = new JPopupMenu();
+		JMenuItem export = new JMenuItem("Export as ...");
+		export.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				FileDialog fd = new FileDialog(new Frame(), "Save ...", FileDialog.SAVE);
+				fd.show();
+				try {
+					FileWriter writer = new FileWriter(fd.getDirectory()+fd.getFile());
+					for(int i = 0; i < detailTable.getRowCount(); i++){
+						for(int j = 0; j < detailTable.getColumnCount() ; j++){
+							if(detailTable.getValueAt(i, j) instanceof Double){
+								writer.append(""+((Double) detailTable.getValueAt(i, j)));
+							}
+							else{
+								writer.append(detailTable.getValueAt(i, j).toString());
+							}
+							writer.append("\t");
+						}
+						writer.append("\r\n");
+					}
+					writer.flush();
+					writer.close();
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+			}
+		});
+		popup.add(export);
+
 		detailTable.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
-				JTable me = ((JTable)e.getSource());
-				clickedIndex = me.convertRowIndexToModel(me.getSelectedRow());
+				if(e.getButton()==MouseEvent.BUTTON1){
+					JTable me = ((JTable)e.getSource());
+					clickedIndex = me.convertRowIndexToModel(me.getSelectedRow());
+				}
+				else if(e.getButton() == MouseEvent.BUTTON3){
+					popup.show(e.getComponent(), e.getX(), e.getY());
+				}
 			}
 		});
 		totalSampleSize = detailTable.getRowCount();
 		detailTable.setRowSorter(getRowSorter(detailTable));
+
 
 
 
