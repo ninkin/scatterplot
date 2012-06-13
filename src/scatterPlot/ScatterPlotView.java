@@ -2,6 +2,7 @@ package scatterPlot;
 import java.awt.BorderLayout;
 import java.awt.Canvas;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
@@ -22,9 +23,11 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
+import java.io.File;
 import java.io.IOException;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -77,7 +80,7 @@ import edu.umd.cs.piccolo.nodes.PPath;
 import edu.umd.cs.piccolo.nodes.PText;
 import edu.umd.cs.piccolox.util.PFixedWidthStroke;
 
-public class ScatterPlotView extends Widget {
+public class ScatterPlotView extends Widget{
 	// UI initialize
 	private final static AtomicReference<Dimension> newCanvasSize = new AtomicReference<Dimension>();
 	boolean closeRequested = false;
@@ -108,6 +111,9 @@ public class ScatterPlotView extends Widget {
 
 	ThemeManager themeManager;
 
+
+	FileOpenDialog fileDialog = new FileOpenDialog();
+
 	//to print text
 	Label toolTipBox = new Label();
 
@@ -131,7 +137,10 @@ public class ScatterPlotView extends Widget {
 	double equalFilter = 1;
 	ArrayList<ExpressionData> dimmingPoints = new ArrayList<ExpressionData>();
 	boolean isAdjusting = false;
-
+	JSlider equalSlider;
+	JSlider smallSlider;
+	JCheckBox scaleCheckBox;
+	JPanel rightPanel;
 
 	//is log scale
 	boolean isLogScale = true;
@@ -142,14 +151,37 @@ public class ScatterPlotView extends Widget {
 	//for drawing
 	Hashtable<String, Color> colormap = new Hashtable<String, Color>();
 
-	public static void main(String[] argv) {
-		spModel = new ScatterPlotModel();
-		spModel.readTXTData("RPKM.txt", "Feature ID", "RPKM1", "RPKM2", "COG Category");
+	public ScatterPlotView(ScatterPlotModel model){
+		spModel = model;
 		rawTable = spModel.getDataTable();
-		ScatterPlotView spView = new ScatterPlotView();
 
-		spView.start();
 	}
+	void fileChanged(){
+		updateMinXY();
+		double margin = (maxXY - minXY)/20.0;
+		camera = new Camera(minXY - margin, maxXY + margin, minXY - margin, maxXY + margin, -10, 10);
+		scaleCheckBox.setSelected(true);
+		equalSlider.setMaximum((int)(spModel.getMaxA()*1000));
+		equalSlider.setMinimum(1000);
+		equalSlider.setValue(1000);
+		smallSlider.setMaximum((int)(Math.log(spModel.getMax()+.1)/Math.log(2)*1000));
+		smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
+		smallSlider.setValue(smallSlider.getMinimum());
+		TableModel detailTableModel = new NonEditableTableModel(spModel.getDataTable(), spModel.getColumnNames());
+		detailTable = new JTable(detailTableModel);
+		totalSampleSize = detailTable.getRowCount();
+		detailTable.setRowSorter(getRowSorter(detailTable));
+		((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
+		for(Component c : rightPanel.getComponents()){
+			if(c instanceof PCanvas){
+				rightPanel.remove(c);
+				rightPanel.add(getHistogram());
+				rightPanel.repaint();
+			}
+		}
+
+}
+
 	void initFilters(){
 		tableFilter.add(RowFilter.regexFilter(""));
 		tableFilter.add(RowFilter.regexFilter(""));
@@ -233,7 +265,6 @@ public class ScatterPlotView extends Widget {
 			}
 			Display.destroy();
 			mainFrame.dispose();
-
 			System.exit(0);
 		} catch (LWJGLException e) {
 			e.printStackTrace();
@@ -277,7 +308,7 @@ public class ScatterPlotView extends Widget {
 
 		controlFrame.setPreferredSize(new Dimension(600, 600));
 
-		JPanel rightPanel = new JPanel();
+		rightPanel = new JPanel();
 		controlFrame.add(rightPanel);
 
 		//frame.setLayout(new BorderLayout());
@@ -316,6 +347,8 @@ public class ScatterPlotView extends Widget {
 
 		rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
 		TableModel detailTableModel = new NonEditableTableModel(spModel.getDataTable(), spModel.getColumnNames());
+
+
 		detailTable = new JTable(detailTableModel);
 
 		detailTable.addMouseListener(new MouseAdapter() {
@@ -326,7 +359,38 @@ public class ScatterPlotView extends Widget {
 			}
 		});
 		totalSampleSize = detailTable.getRowCount();
-		TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(detailTable.getModel());
+		detailTable.setRowSorter(getRowSorter(detailTable));
+
+
+
+		JScrollPane tablePane = new JScrollPane(detailTable);
+		rightPanel.add(tablePane);
+
+		scaleCheckBox = new JCheckBox("Log Scale");
+		scaleCheckBox.setSelected(true);
+		scaleCheckBox.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				JCheckBox me = (JCheckBox)e.getSource();
+				isLogScale = me.isSelected();
+				updateMinXY();
+				double margin = (maxXY-minXY)/20.0;
+				camera.setCamera(minXY-margin, maxXY+margin, minXY-margin, maxXY+margin, -10, 10);
+			}
+		});
+		rightPanel.add(scaleCheckBox);
+
+		PCanvas histogramView = getHistogram();
+		rightPanel.add(histogramView);
+
+		JPanel smallFilterPanel = getSmallFilterPanel(scaleCheckBox);
+		rightPanel.add(smallFilterPanel);
+
+		JPanel equalPanel = getEqualFilterPanel();
+		rightPanel.add(equalPanel);
+	}
+	private TableRowSorter<TableModel> getRowSorter(JTable table) {
+		TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(table.getModel());
 		sorter.setComparator(0, new Comparator(){
 			@Override
 			public int compare(Object o1, Object o2) {
@@ -346,252 +410,17 @@ public class ScatterPlotView extends Widget {
 		sortkeys.add(new RowSorter.SortKey(0, SortOrder.ASCENDING));
 		sortkeys.add(new RowSorter.SortKey(3, SortOrder.ASCENDING));
 		sorter.setSortKeys(sortkeys);
-		detailTable.setRowSorter(sorter);
-
-
-
-		JScrollPane tablePane = new JScrollPane(detailTable);
-		rightPanel.add(tablePane);
-
-		JCheckBox scaleCheckBox = new JCheckBox("Log Scale");
-		scaleCheckBox.setSelected(true);
-		scaleCheckBox.addChangeListener(new ChangeListener() {
-			@Override
-			public void stateChanged(ChangeEvent e) {
-				JCheckBox me = (JCheckBox)e.getSource();
-				isLogScale = me.isSelected();
-				updateMinXY();
-				double margin = (maxXY-minXY)/20.0;
-				camera.setCamera(minXY-margin, maxXY+margin, minXY-margin, maxXY+margin, -10, 10);
-			}
-		});
-		rightPanel.add(scaleCheckBox);
-
-		PCanvas histogramView = new PCanvas();
-
-		histogramView.setPanEventHandler(null);
-
-
-		final PText tooltipNode = new PText();
-		final PCamera pcamera = histogramView.getCamera();
-
-		tooltipNode.setPickable(false);
-		pcamera.addChild(tooltipNode);
-
-		pcamera.addInputEventListener(new PBasicInputEventHandler(){
-			public void mouseMoved(PInputEvent event){
-				updateToolTip(event);
-			}
-			public void mouseDragged(PInputEvent event){
-				updateToolTip(event);
-			}
-			public void updateToolTip(PInputEvent event){
-				PNode n = event.getInputManager().getMouseOver().getPickedNode();
-				String name = (String)n.getAttribute("name");
-				Point2D p = event.getCanvasPosition();
-
-
-				event.getPath().canvasToLocal(p, pcamera);
-				tooltipNode.setText(name);
-				tooltipNode.setOffset(p.getX() + 8, p.getY() - 8);
-
-			}
-		});
-
-		histogramView.setPreferredSize(new Dimension(getWidth(), 200));
-		Iterator<Entry<String, Category>> categoriesSet = spModel.biggerCategoties.entrySet().iterator();
-		int categoryWidth = 20;
-		int x = categoryWidth;
-		while(categoriesSet.hasNext()){
-			final Category category = categoriesSet.next().getValue();
-			PNode categoryNode = PPath.createRectangle(x, 100-category.data.size()/50, categoryWidth, category.data.size()/50);
-			final PText categoryText = new PText(category.category);
-			final PText categoryValue = new PText(category.data.size()+"");
-
-
-			categoryNode.addAttribute("name", category.category);
-			categoryNode.setPaint(getColorByCategory(category.category));
-			categoryText.setOffset(x+categoryWidth/2-categoryText.getWidth()/2, 100);
-			categoryText.setPickable(false);
-			categoryValue.setScale(0.8);
-			categoryValue.setOffset(x+categoryWidth/2-categoryValue.getWidth()/2, 100 - category.data.size()/50-categoryValue.getHeight());
-			categoryValue.setTextPaint(Color.gray);
-			categoryValue.setPickable(false);
-
-			categoryNode.addInputEventListener(new PBasicInputEventHandler(){
-				public void mousePressed(PInputEvent event){
-					super.mousePressed(event);
-					category.toggleActivation();
-					if(category.isActivated){
-						event.getPickedNode().setPaint(getColorByCategory(category.category));
-					}
-					else{
-						event.getPickedNode().setPaint(Color.WHITE);
-					}
-					tableFilter.add(2, new RowFilter<Object, Object>(){
-						public boolean include(Entry<? extends Object, ? extends Object> entry) {
-							String categoryName = ((Category)entry.getValue(3)).category.substring(0,1);
-							if(spModel.biggerCategoties.get(categoryName).isActivated)
-								return true;
-							else
-								return false;
-						}
-					});
-					((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
-				}
-				public void mouseEntered(PInputEvent event){
-					super.mouseEntered(event);
-					((PText)event.getPickedNode().getChild(1)).setTextPaint(Color.black);
-					java.awt.Cursor a= new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR);
-					event.pushCursor(a);
-				}
-				public void mouseExited(PInputEvent event){
-					super.mouseExited(event);
-					((PText)event.getPickedNode().getChild(1)).setTextPaint(Color.gray);
-					event.popCursor();
-				}
-			});
-
-			histogramView.getLayer().addChild(categoryNode);
-			categoryNode.addChild(categoryText);
-			categoryNode.addChild(categoryValue);
-			x += categoryWidth*1.1;
-		}
-
-		rightPanel.add(histogramView);
-
-
-		JPanel smallSliderPanel = new JPanel();
-		JLabel smallFilterLabel = new JLabel("RPKM Filter");
-		smallFilterLabel.setPreferredSize(new Dimension(100, 20));
-		final IntegerTextField smallTextField = new IntegerTextField();
-		final JSlider smallSlider = new JSlider();
-		if(isLogScale){
-			smallSlider.setMaximum((int)(Math.log(spModel.getMax()+.1)/Math.log(2)*1000));
-			smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
-			smallSlider.setValue(smallSlider.getMinimum());
-		}
-		else{
-			smallSlider.setMaximum((int)(spModel.getMax()*1000));
-			smallSlider.setMinimum(0);
-			smallSlider.setValue(smallSlider.getMinimum());
-		}
-		rightPanel.add(smallSliderPanel);
-
-
-		smallSliderPanel.setLayout(new FlowLayout());
-		smallSliderPanel.add(smallFilterLabel);
-		smallSliderPanel.add(smallTextField);
-
-		/***
-		 * Small Text Field
-		 */
-		smallTextField.setPreferredSize(new Dimension(100, 20));
-		smallTextField.setHorizontalAlignment(JTextField.RIGHT);
-		smallTextField.addKeyListener(new KeyAdapter(){
-			public void processKeyEvent(KeyEvent e){
-
-			}
-			public void keyPressed(KeyEvent e){
-				int key = e.getKeyCode();
-				if (key == KeyEvent.VK_ENTER) {
-					try{
-						double v = Double.parseDouble(smallTextField.getText());
-						smallSlider.setValue((int) (v*1000));
-					}
-					catch (NumberFormatException e1){
-						return ;
-					}
-				}
-			}
-		});
-		smallTextField.setEditable(true);
-		smallTextField.setFocusable(true);
-
-
-		smallSlider.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseReleased(MouseEvent e){
-				isAdjusting = false;
-			}
-			@Override
-			public void mousePressed(MouseEvent e){
-				isAdjusting = true;
-			}
-		});
-		smallSlider.addChangeListener(new ChangeListener(){
-			@Override
-			public void stateChanged(ChangeEvent arg0) {
-				JSlider me = (JSlider)arg0.getSource();
-				smallFilter = me.getValue()/1000.0-.1;
-				tableFilter.set(0, new RowFilter<Object, Object>(){
-					public boolean include(Entry<? extends Object, ? extends Object> entry) {
-						if(isLogScale){
-							if(Math.log(Double.parseDouble(""+entry.getValue(1))+.1)/Math.log(2) > smallFilter &&
-									Math.log(Double.parseDouble(""+entry.getValue(2))+.1)/Math.log(2) > smallFilter)
-								return true;
-							else
-								return false;
-						}
-						else{
-							if(Double.parseDouble(""+entry.getValue(1)) > smallFilter &&
-									Double.parseDouble(""+entry.getValue(2)) > smallFilter)
-								return true;
-							else
-								return false;
-						}
-					}
-				});
-				((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
-				smallTextField.setText(""+me.getValue()/1000.0);
-			}
-		});
-
-		smallSlider.setPaintLabels(true);
-		smallSlider.setPaintTicks(true);
-
-		final Hashtable<Integer, JLabel> labelTableLogScale = new Hashtable<Integer, JLabel>();
-		for(int i = (int) log2(spModel.getMin()); i < log2(spModel.getMax()); i ++){
-			labelTableLogScale.put(new Integer(i*1000), new JLabel(i+""));
-		}
-		final Hashtable<Integer, JLabel> labelTableOriginalScale = new Hashtable<Integer, JLabel>();
-		for(int i = 0; i < spModel.getMax(); i+=Math.pow(10, (int)Math.log10(spModel.getMax()))){
-			labelTableOriginalScale.put(new Integer(i*1000), new JLabel(i+""));
-		}
-
-		smallSlider.setLabelTable(labelTableLogScale);
-		rightPanel.add(smallSlider);
-
-		scaleCheckBox.addChangeListener(new ChangeListener() {
-			@Override
-			public void stateChanged(ChangeEvent e) {
-				JCheckBox me = (JCheckBox)e.getSource();
-				isLogScale = me.isSelected();
-				if(isLogScale){
-					smallSlider.setLabelTable(labelTableLogScale);
-					smallSlider.setMaximum((int)(Math.log(spModel.getMax()+.1)/Math.log(2)*1000));
-					smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
-					smallSlider.setValue(smallSlider.getMinimum());
-				}
-				else{
-					smallSlider.setLabelTable(labelTableOriginalScale);
-					smallSlider.setMaximum((int)(spModel.getMax()*1000));
-					smallSlider.setMinimum(0);
-					smallSlider.setValue(smallSlider.getMinimum());
-				}
-			}
-		});
-
-
+		return sorter;
+	}
+	private JPanel getEqualFilterPanel() {
 		JPanel equalPanel = new JPanel();
 		equalPanel.setLayout(new FlowLayout());
-		rightPanel.add(equalPanel);
 
 		JLabel equalFilterLabel = new JLabel("Difference Filter");
 		equalFilterLabel.setPreferredSize(new Dimension(100, 20));
 		equalPanel.add(equalFilterLabel);
 		final IntegerTextField equalTextField = new IntegerTextField();
-		final JSlider equalSlider = new JSlider(1000, (int)(spModel.getMaxA()*1000), 1000);
+		equalSlider = new JSlider(1000, (int)(spModel.getMaxA()*1000), 1000);
 
 		/***
 		 * Equal Text Field
@@ -657,16 +486,224 @@ public class ScatterPlotView extends Widget {
 			equalLabelTable.put(new Integer(i*1000), new JLabel(i+""));
 		}
 		equalSlider.setLabelTable(equalLabelTable);
-/*		equalSlider.setUI(new BasicSliderUI(equalSlider) {
-			  public void paintThumb(Graphics g) {
-				    super.paintThumb(g);
-				    g.setColor(Color.black);
-				    g.drawString(Double.toString(slider.getValue()/1000.0), thumbRect.x, thumbRect.y + thumbRect.height+10);
-				  }
-				});*/
-		rightPanel.add(equalSlider);
+		equalPanel.add(equalSlider);
+		return equalPanel;
+	}
+	private PCanvas getHistogram() {
+		PCanvas histogramView = new PCanvas();
+
+		histogramView.setPanEventHandler(null);
 
 
+		final PText tooltipNode = new PText();
+		final PCamera pcamera = histogramView.getCamera();
+
+		tooltipNode.setPickable(false);
+		pcamera.addChild(tooltipNode);
+
+		pcamera.addInputEventListener(new PBasicInputEventHandler(){
+			public void mouseMoved(PInputEvent event){
+				updateToolTip(event);
+			}
+			public void mouseDragged(PInputEvent event){
+				updateToolTip(event);
+			}
+			public void updateToolTip(PInputEvent event){
+				PNode n = event.getInputManager().getMouseOver().getPickedNode();
+				String name = (String)n.getAttribute("name");
+				Point2D p = event.getCanvasPosition();
+
+
+				event.getPath().canvasToLocal(p, pcamera);
+				tooltipNode.setText(name);
+				tooltipNode.setOffset(p.getX() + 8, p.getY() - 8);
+
+			}
+		});
+
+		histogramView.setPreferredSize(new Dimension(getWidth(), 200));
+
+		List<String> categoryNames = new ArrayList<String>(spModel.biggerCategoties.keySet());
+		Collections.sort(categoryNames);
+		int categoryWidth = 20;
+		int x = categoryWidth;
+		for(String name : categoryNames){
+			final Category category = spModel.biggerCategoties.get(name);
+			PNode categoryNode = PPath.createRectangle(x, 100-category.data.size()/50, categoryWidth, category.data.size()/50);
+			final PText categoryText = new PText(category.category);
+			final PText categoryValue = new PText(category.data.size()+"");
+
+
+			categoryNode.addAttribute("name", category.category);
+			categoryNode.setPaint(getColorByCategory(category.category));
+			categoryText.setOffset(x+categoryWidth/2-categoryText.getWidth()/2, 100);
+			categoryText.setPickable(false);
+			categoryValue.setScale(0.8);
+			categoryValue.setOffset(x+categoryWidth/2-categoryValue.getWidth()/2, 100 - category.data.size()/50-categoryValue.getHeight());
+			categoryValue.setTextPaint(Color.gray);
+			categoryValue.setPickable(false);
+
+			categoryNode.addInputEventListener(new PBasicInputEventHandler(){
+				public void mousePressed(PInputEvent event){
+					super.mousePressed(event);
+					category.toggleActivation();
+					if(category.isActivated){
+						event.getPickedNode().setPaint(getColorByCategory(category.category));
+					}
+					else{
+						event.getPickedNode().setPaint(Color.WHITE);
+					}
+					tableFilter.add(2, new RowFilter<Object, Object>(){
+						public boolean include(Entry<? extends Object, ? extends Object> entry) {
+							String categoryName = ((Category)entry.getValue(3)).category.substring(0,1);
+							if(spModel.biggerCategoties.get(categoryName).isActivated)
+								return true;
+							else
+								return false;
+						}
+					});
+					((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
+				}
+				public void mouseEntered(PInputEvent event){
+					super.mouseEntered(event);
+					((PText)event.getPickedNode().getChild(1)).setTextPaint(Color.black);
+					java.awt.Cursor a= new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR);
+					event.pushCursor(a);
+				}
+				public void mouseExited(PInputEvent event){
+					super.mouseExited(event);
+					((PText)event.getPickedNode().getChild(1)).setTextPaint(Color.gray);
+					event.popCursor();
+				}
+			});
+
+			histogramView.getLayer().addChild(categoryNode);
+			categoryNode.addChild(categoryText);
+			categoryNode.addChild(categoryValue);
+			x += categoryWidth*1.1;
+		}
+		return histogramView;
+	}
+	private JPanel getSmallFilterPanel(JCheckBox scaleCheckBox){
+		JPanel smallSliderPanel = new JPanel();
+		JLabel smallFilterLabel = new JLabel("RPKM Filter");
+		smallFilterLabel.setPreferredSize(new Dimension(100, 20));
+		final IntegerTextField smallTextField = new IntegerTextField();
+		smallSlider = new JSlider();
+		if(isLogScale){
+			smallSlider.setMaximum((int)(Math.log(spModel.getMax()+.1)/Math.log(2)*1000));
+			smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
+			smallSlider.setValue(smallSlider.getMinimum());
+		}
+		else{
+			smallSlider.setMaximum((int)(spModel.getMax()*1000));
+			smallSlider.setMinimum(0);
+			smallSlider.setValue(smallSlider.getMinimum());
+		}
+
+		smallSliderPanel.setLayout(new FlowLayout());
+		smallSliderPanel.add(smallFilterLabel);
+		smallSliderPanel.add(smallTextField);
+
+
+		/***
+		 * Small Text Field
+		 */
+		smallTextField.setPreferredSize(new Dimension(100, 20));
+		smallTextField.setHorizontalAlignment(JTextField.RIGHT);
+		smallTextField.addKeyListener(new KeyAdapter(){
+			public void processKeyEvent(KeyEvent e){
+
+			}
+			public void keyPressed(KeyEvent e){
+				int key = e.getKeyCode();
+				if (key == KeyEvent.VK_ENTER) {
+					try{
+						double v = Double.parseDouble(smallTextField.getText());
+						smallSlider.setValue((int) (v*1000));
+					}
+					catch (NumberFormatException e1){
+						return ;
+					}
+				}
+			}
+		});
+		smallTextField.setEditable(true);
+		smallTextField.setFocusable(true);
+
+
+		smallSliderPanel.add(smallSlider);
+		smallSlider.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseReleased(MouseEvent e){
+				isAdjusting = false;
+			}
+			@Override
+			public void mousePressed(MouseEvent e){
+				isAdjusting = true;
+			}
+		});
+		smallSlider.addChangeListener(new ChangeListener(){
+			@Override
+			public void stateChanged(ChangeEvent arg0) {
+				JSlider me = (JSlider)arg0.getSource();
+				smallFilter = me.getValue()/1000.0-.1;
+				tableFilter.set(0, new RowFilter<Object, Object>(){
+					public boolean include(Entry<? extends Object, ? extends Object> entry) {
+						if(isLogScale){
+							if(Math.log(Double.parseDouble(""+entry.getValue(1))+.1)/Math.log(2) > smallFilter &&
+									Math.log(Double.parseDouble(""+entry.getValue(2))+.1)/Math.log(2) > smallFilter)
+								return true;
+							else
+								return false;
+						}
+						else{
+							if(Double.parseDouble(""+entry.getValue(1)) > smallFilter &&
+									Double.parseDouble(""+entry.getValue(2)) > smallFilter)
+								return true;
+							else
+								return false;
+						}
+					}
+				});
+				((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
+				smallTextField.setText(""+me.getValue()/1000.0);
+			}
+		});
+
+		smallSlider.setPaintLabels(true);
+		smallSlider.setPaintTicks(true);
+
+		final Hashtable<Integer, JLabel> labelTableLogScale = new Hashtable<Integer, JLabel>();
+		for(int i = (int) log2(spModel.getMin()); i < log2(spModel.getMax()); i ++){
+			labelTableLogScale.put(new Integer(i*1000), new JLabel(i+""));
+		}
+		final Hashtable<Integer, JLabel> labelTableOriginalScale = new Hashtable<Integer, JLabel>();
+		for(int i = 0; i < spModel.getMax(); i+=Math.pow(10, (int)Math.log10(spModel.getMax()))){
+			labelTableOriginalScale.put(new Integer(i*1000), new JLabel(i+""));
+		}
+
+		smallSlider.setLabelTable(labelTableLogScale);
+		scaleCheckBox.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				JCheckBox me = (JCheckBox)e.getSource();
+				isLogScale = me.isSelected();
+				if(isLogScale){
+					smallSlider.setLabelTable(labelTableLogScale);
+					smallSlider.setMaximum((int)(Math.log(spModel.getMax()+.1)/Math.log(2)*1000));
+					smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
+					smallSlider.setValue(smallSlider.getMinimum());
+				}
+				else{
+					smallSlider.setLabelTable(labelTableOriginalScale);
+					smallSlider.setMaximum((int)(spModel.getMax()*1000));
+					smallSlider.setMinimum(0);
+					smallSlider.setValue(smallSlider.getMinimum());
+				}
+			}
+		});
+		return smallSliderPanel;
 	}
 	private void makeMenubar() {
 		menuBar = new JMenuBar();
@@ -677,7 +714,12 @@ public class ScatterPlotView extends Widget {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				// TODO Auto-generated method stub
-				new FileOpenDialog();
+				fileDialog.show();
+				File file = fileDialog.getFile();
+				if(file != null){
+					spModel.readTXTData(file.getPath(), "Feature ID", "RPKM1", "RPKM2", "COG Category");
+					fileChanged();
+				}
 			}
 
 		});
@@ -886,7 +928,7 @@ public class ScatterPlotView extends Widget {
 		GL11.glInitNames();
 		Vector<Integer> drawOnTop = new Vector<Integer>();
 
-		for(int i = 0; i < totalSampleSize; i++){
+		for(int i = 0; i < detailTable.getRowCount(); i++){
 			ExpressionData data = rawTable.get(i);
 
 			double[] xy = getAdjustedLocation(data, isLogScale);
@@ -1031,7 +1073,7 @@ public class ScatterPlotView extends Widget {
 		int xpos[] = getBoundary(maxXY*1.15, 0, 0);
 		int ypos[] = getBoundary(0, maxXY*1.15, 0);
 
-		xAxisLabel.setPosition(xpos[0]-10, xpos[1]+10);
+		xAxisLabel.setPosition(xpos[0]-10, xpos[1]+30);
 		yAxisLabel.setPosition(ypos[0]-10, ypos[1]+10);
 
 	}
@@ -1108,15 +1150,15 @@ public class ScatterPlotView extends Widget {
 	private void drawMinMax(){
 		GL11.glColor3d(0, 0, 0);
 		int xpos[] = Translater.getScreenCoordinate((float) maxX, 0, 0);
-		xMaxLabel.setText(spModel.getMaxX()+"");
-		xMaxLabel.setPosition(xpos[0], Display.getHeight()-xpos[1]+xMaxLabel.getPreferredHeight());
+		xMaxLabel.setText(String.format("%.2f", spModel.getMaxX()));
+		xMaxLabel.setPosition(xpos[0], Display.getHeight()-xpos[1]+xMaxLabel.getPreferredHeight()-10);
 		GL11.glBegin(GL11.GL_LINES);
 		GL11.glVertex2d(maxX, -.1);
 		GL11.glVertex2d(maxX, .1);
 		GL11.glEnd();
 
 		int ypos[] = Translater.getScreenCoordinate(0, (float) maxY, 0);
-		yMaxLabel.setText(spModel.getMaxY()+"");
+		yMaxLabel.setText(String.format("%.2f", spModel.getMaxY()));
 		yMaxLabel.setPosition(ypos[0] - yMaxLabel.getPreferredWidth(), Display.getHeight()-ypos[1]);
 		GL11.glBegin(GL11.GL_LINES);
 		GL11.glVertex2d(-.1, maxY);

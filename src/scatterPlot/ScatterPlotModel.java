@@ -8,14 +8,14 @@ import java.util.Vector;
 
 
 public class ScatterPlotModel {
-	private static Vector<ExpressionData> dataTable = new Vector<ExpressionData>();
+	private static Vector<ExpressionData> dataTable;
 	private double minX = Double.MAX_VALUE;
 	private double maxX = Double.MIN_VALUE;
 	private double minY = Double.MAX_VALUE;
 	private double maxY = Double.MIN_VALUE;
 	private double maxA = Double.MIN_VALUE;
-	public HashMap<String, Category> catetories = new HashMap<String, Category>();
-	public HashMap<String, Category> biggerCategoties = new HashMap<String, Category>();
+	public HashMap<String, Category> catetories;
+	public HashMap<String, Category> biggerCategoties;
 
 	public Vector<ExpressionData> getDataTable(){
 		return dataTable;
@@ -100,6 +100,12 @@ public class ScatterPlotModel {
 
 	}
 	public void readTXTData(String filename, String FeatureID, String RPKM1, String RPKM2, String Category){
+		//initializing
+		dataTable = new Vector<ExpressionData>();
+		catetories = new HashMap<String, Category>();
+		biggerCategoties = new HashMap<String, Category>();
+
+
 		try {
 			BufferedReader in = new BufferedReader(new FileReader(filename));
 			String buffer;
@@ -169,6 +175,8 @@ public class ScatterPlotModel {
 				ExpressionData newData = new ExpressionData(name, x, y, category);
 				category2.addData(newData);
 				category.addData(newData);
+
+
 				dataTable.add(newData);
 			}
 
