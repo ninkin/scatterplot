@@ -25,9 +25,11 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,6 +41,7 @@ import java.util.Map.Entry;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.imageio.ImageIO;
 import javax.swing.BoxLayout;
 import javax.swing.JCheckBox;
 import javax.swing.JFrame;
@@ -149,6 +152,9 @@ public class ScatterPlotView extends Widget{
 	//is log scale
 	boolean isLogScale = true;
 
+	boolean screenShotRequested = false;
+	File screenShot;
+
 	JLabel statusLabel;
 
 
@@ -183,7 +189,6 @@ public class ScatterPlotView extends Widget{
 			}
 		}
 		rightPanel.revalidate();
-
 }
 
 	void initFilters(){
@@ -266,6 +271,11 @@ public class ScatterPlotView extends Widget{
 				toolTipBox.setPosition(Mouse.getX()+20, canvas.getHeight() - Mouse.getY()+10);
 				gui.update();
 				Display.update();
+				if(screenShotRequested == true){
+					saveScreenImage();
+					screenShotRequested = false;
+					screenShot = null;
+				}
 			}
 			Display.destroy();
 			mainFrame.dispose();
@@ -362,7 +372,7 @@ public class ScatterPlotView extends Widget{
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				FileDialog fd = new FileDialog(new Frame(), "Save ...", FileDialog.SAVE);
-				fd.show();
+				fd.setVisible(true);
 				try {
 					FileWriter writer = new FileWriter(fd.getDirectory()+fd.getFile());
 					for(int i = 0; i < detailTable.getRowCount(); i++){
@@ -375,7 +385,7 @@ public class ScatterPlotView extends Widget{
 							}
 							writer.append("\t");
 						}
-						writer.append("\r\n");
+						writer.append("\r\n");//\n for linux
 					}
 					writer.flush();
 					writer.close();
@@ -757,6 +767,29 @@ public class ScatterPlotView extends Widget{
 		});
 		return smallSliderPanel;
 	}
+	private void saveScreenImage(){
+		GL11.glReadBuffer(GL11.GL_FRONT);
+		int width = Display.getWidth();
+		int height= Display.getHeight();
+		int bpp = 4; // Assuming a 32-bit display with a byte each for red, green, blue, and alpha.
+		ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * bpp);
+		GL11.glReadPixels(0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer );
+		BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+		for(int x = 0; x < width; x++)
+			for(int y = 0; y < height; y++)
+			{
+				int i = (x + (width * y)) * bpp;
+				int r = buffer.get(i) & 0xFF;
+				int g = buffer.get(i + 1) & 0xFF;
+				int b = buffer.get(i + 2) & 0xFF;
+				image.setRGB(x, height - (y + 1), (0xFF << 24) | (r << 16) | (g << 8) | b);
+			}
+
+		try {
+			ImageIO.write(image, "PNG", screenShot);
+		} catch (IOException e2) { e2.printStackTrace(); }
+
+	}
 	private void makeMenubar() {
 		menuBar = new JMenuBar();
 
@@ -776,6 +809,19 @@ public class ScatterPlotView extends Widget{
 
 		});
 		fileMenu.add(open);
+
+		JMenuItem pngExport = new JMenuItem("Export as PNG");
+		pngExport .addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+
+				FileDialog fd = new FileDialog(new Frame());
+				fd.setVisible(true);
+				screenShot = new File(fd.getDirectory()+fd.getFile());
+				screenShotRequested = true;
+			}
+		});
+		fileMenu.add(pngExport);
 
 		JMenuItem close = new JMenuItem("Exit", KeyEvent.VK_X);
 		close.addActionListener(new ActionListener() {
