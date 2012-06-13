@@ -414,11 +414,16 @@ public class ScatterPlotView extends Widget{
 	}
 	private JPanel getEqualFilterPanel() {
 		JPanel equalPanel = new JPanel();
-		equalPanel.setLayout(new FlowLayout());
+		equalPanel.setLayout(new BoxLayout(equalPanel, BoxLayout.Y_AXIS));
+
+		JPanel equalSubPanel = new JPanel();
+		equalSubPanel.setLayout(new FlowLayout());
+
+		equalPanel.add(equalSubPanel);
 
 		JLabel equalFilterLabel = new JLabel("Difference Filter");
 		equalFilterLabel.setPreferredSize(new Dimension(100, 20));
-		equalPanel.add(equalFilterLabel);
+		equalSubPanel.add(equalFilterLabel);
 		final IntegerTextField equalTextField = new IntegerTextField();
 		equalSlider = new JSlider(1000, (int)(spModel.getMaxA()*1000), 1000);
 
@@ -442,7 +447,7 @@ public class ScatterPlotView extends Widget{
 			}
 		});
 		equalTextField.setEditable(true);
-		equalPanel.add(equalTextField);
+		equalSubPanel.add(equalTextField);
 
 
 		equalSlider.addMouseListener(new MouseAdapter() {
@@ -586,6 +591,11 @@ public class ScatterPlotView extends Widget{
 	}
 	private JPanel getSmallFilterPanel(JCheckBox scaleCheckBox){
 		JPanel smallSliderPanel = new JPanel();
+		smallSliderPanel.setLayout(new BoxLayout(smallSliderPanel, BoxLayout.Y_AXIS));
+
+		JPanel smallSubPanel = new JPanel();
+		smallSliderPanel.add(smallSubPanel);
+
 		JLabel smallFilterLabel = new JLabel("RPKM Filter");
 		smallFilterLabel.setPreferredSize(new Dimension(100, 20));
 		final IntegerTextField smallTextField = new IntegerTextField();
@@ -601,9 +611,9 @@ public class ScatterPlotView extends Widget{
 			smallSlider.setValue(smallSlider.getMinimum());
 		}
 
-		smallSliderPanel.setLayout(new FlowLayout());
-		smallSliderPanel.add(smallFilterLabel);
-		smallSliderPanel.add(smallTextField);
+		smallSubPanel.setLayout(new FlowLayout());
+		smallSubPanel.add(smallFilterLabel);
+		smallSubPanel.add(smallTextField);
 
 
 		/***
@@ -961,7 +971,7 @@ public class ScatterPlotView extends Widget{
 			GL11.glPointSize(14);
 			GL11.glColor3f(0, 0, 0);
 			GL11.glBegin(GL11.GL_POINTS);
-			GL11.glVertex3d(xy[0], xy[1], 0);
+			GL11.glVertex2d(xy[0], xy[1]);
 			GL11.glEnd();
 			GL11.glPopName();
 		}
