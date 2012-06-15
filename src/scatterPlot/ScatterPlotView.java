@@ -43,7 +43,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.imageio.ImageIO;
 import javax.swing.BoxLayout;
+import javax.swing.ComboBoxModel;
+import javax.swing.DefaultComboBoxModel;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
@@ -62,6 +65,7 @@ import javax.swing.SortOrder;
 import javax.swing.border.BevelBorder;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.event.ListDataListener;
 import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
@@ -77,6 +81,9 @@ import de.matthiasmann.twl.ComboBox;
 import de.matthiasmann.twl.GUI;
 import de.matthiasmann.twl.Label;
 import de.matthiasmann.twl.Widget;
+import de.matthiasmann.twl.model.ListModel;
+import de.matthiasmann.twl.model.SimpleChangableListModel;
+import de.matthiasmann.twl.model.SimpleListModel;
 import de.matthiasmann.twl.renderer.lwjgl.LWJGLRenderer;
 import de.matthiasmann.twl.theme.ThemeManager;
 import edu.umd.cs.piccolo.PCamera;
@@ -126,12 +133,15 @@ public class ScatterPlotView extends Widget{
 
 	int xIndex = 0;
 	int yIndex = 1;
+    JComboBox<String> xColumnList;
+    JComboBox<String> yColumnList;
 
 	//layouts
 	JMenuBar menuBar;
 	JFrame mainFrame = new JFrame("RPKM Scatterplot");
 	JFrame controlFrame = new JFrame("Control Frame");
 	final Canvas canvas = new Canvas();
+	final JPanel canvasPanel =  new JPanel();
 
 	//labels
 	Label xAxisLabel = new Label("X");
@@ -167,6 +177,8 @@ public class ScatterPlotView extends Widget{
 	}
 	void fileChanged(){
 		updateMinXY();
+		xColumnList.setModel(new DefaultComboBoxModel<String>(spModel.getDataColumnNames()));
+		yColumnList.setModel(new DefaultComboBoxModel<String>(spModel.getDataColumnNames()));
 		double margin = (max - min)/20.0;
 		camera = new Camera(min - margin, max + margin, min - margin, max + margin, -10, 10);
 		scaleCheckBox.setSelected(true);
@@ -207,6 +219,14 @@ public class ScatterPlotView extends Widget{
 	}
 	public void start() {
 		updateMinXY();
+		int i = 0;
+		ArrayList<ColumnEntry> columns = new ArrayList<ScatterPlotView.ColumnEntry>();
+		for(String s : spModel.getColumnNames()){
+			ColumnEntry c = new ColumnEntry(s, i++);
+			columns.add(c);
+		}
+
+
 		double margin = (max - min)/20.0;
 		camera = new Camera(min - margin, max + margin, min - margin, max + margin, -10, 10);
 		makeColorMap();
@@ -294,6 +314,7 @@ public class ScatterPlotView extends Widget{
             xMaxLabel.setTheme("label");
             yMaxLabel.setTheme("label");
 
+
     		add(toolTipBox);
     		add(xAxisLabel);
     		add(yAxisLabel);
@@ -311,6 +332,26 @@ public class ScatterPlotView extends Widget{
 		makeMenubar();
 
 
+        xColumnList = new JComboBox<String>(spModel.getDataColumnNames());
+        yColumnList = new JComboBox<String>(spModel.getDataColumnNames());
+
+        xColumnList.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				// TODO Auto-generated method stub
+				xIndex = ((JComboBox)e.getSource()).getSelectedIndex();
+			}
+		});
+        yColumnList.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				// TODO Auto-generated method stub
+				yIndex = ((JComboBox)e.getSource()).getSelectedIndex();
+			}
+		});
+
+        canvasPanel.add(xColumnList);
+        canvasPanel.add(yColumnList);
 
 		controlFrame.setPreferredSize(new Dimension(600, 600));
 
@@ -319,6 +360,7 @@ public class ScatterPlotView extends Widget{
 
 		//frame.setLayout(new BorderLayout());
 
+		canvasPanel.add(canvas);
 
 
 		canvas.addComponentListener(new ComponentAdapter() {
@@ -339,7 +381,7 @@ public class ScatterPlotView extends Widget{
 			}
 		});
 
-		mainFrame.add(canvas, BorderLayout.CENTER);
+		mainFrame.add(canvasPanel, BorderLayout.CENTER);
 		canvas.setPreferredSize(new java.awt.Dimension(600, 600));
 
 		JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -1255,6 +1297,14 @@ public class ScatterPlotView extends Widget{
 		GL11.glEnd();
 
 
+	}
+	class ColumnEntry{
+		final String columnName;
+		final int i;
+		public ColumnEntry(String columnName, int i){
+			this.columnName = columnName;
+			this.i = i;
+		}
 	}
 }
 

@@ -4,6 +4,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Vector;
 
 
@@ -11,6 +12,7 @@ public class ScatterPlotModel {
 	private static Vector<ExpressionData> dataTable;
 	public HashMap<String, Category> catetories;
 	private Vector<String> columnNames;
+	private Vector<String> dataColumnNames;
 	private Vector<Double> maxs;
 	private Vector<Double> mins;
 	private double max;
@@ -37,6 +39,9 @@ public class ScatterPlotModel {
 	public double getMaxA(){
 		return 10;
 	}
+	public Vector<String> getDataColumnNames(){
+		return dataColumnNames;
+	}
 	public Vector<String> getColumnNames(){
 		return columnNames;
 	}
@@ -46,6 +51,7 @@ public class ScatterPlotModel {
 		columnNames = new Vector<String>();
 		dataTable = new Vector<ExpressionData>();
 		catetories = new HashMap<String, Category>();
+		dataColumnNames = new Vector<String>();
 
 		try {
 			BufferedReader in = new BufferedReader(new FileReader(filename));
@@ -54,6 +60,9 @@ public class ScatterPlotModel {
 			String[] tokens = buffer.split("\t");
 			for(int i = 0; i < tokens.length; i++){
 				columnNames.add(tokens[i]);
+			}
+			for(int i = 1; i < tokens.length-1; i++){
+				dataColumnNames.add(tokens[i]);
 			}
 			maxs = new Vector<Double>(columnNames.size()-2);
 			for(int i = 0; i < columnNames.size() - 2; i++){
