@@ -8,27 +8,17 @@ public class ExpressionData extends Vector<Object>{
 	public boolean isDimming = false;
 	final double DEFAULT_ALPHA = 0.8;
 	public double alpha = DEFAULT_ALPHA;
-	public ExpressionData(String name, double x, double y, Category category){
-		this.add(name);
-		this.add(x);
-		this.add(y);
-		this.add(category);
-		if(x != 0 && y != 0)
-			this.add(Math.max(x, y)/Math.min(x,  y));
-		else
-			this.add(0);
+	public ExpressionData(Vector<Object> data){
+		this.addAll(data);
 	}
 
 	public String getName(){
 		return (String)this.get(0);
 	}
-	public double getX(){
-		return (Double) this.get(1);
-	}
-	public double getY(){
-		return (Double)this.get(2);
-	}
 	public Category getCategory(){
-		return (Category)this.get(3);
+		return (Category)this.get(this.size()-1);
+	}
+	public double getExp(int i){
+		return Double.parseDouble(""+this.get(i+1));
 	}
 }

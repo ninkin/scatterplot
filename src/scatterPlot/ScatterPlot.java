@@ -9,19 +9,19 @@ public class ScatterPlot implements Runnable {
 
 	public ScatterPlot(Vector<Vector <Object>> data){
 		model = new ScatterPlotModel();
-		model.readTXTData("RPKM.txt", "Feature ID", "RPKM1", "RPKM2", "COG Category");
+		model.readTXTData("RPKM.txt");
 		view = new ScatterPlotView(model);
 		controller = new ScatterPlotController(view, model);
 	}
 	public ScatterPlot(String input){
 		model = new ScatterPlotModel();
-		model.readTXTData(input, "Feature ID", "RPKM1", "RPKM2", "COG Category");
+		model.readTXTData(input);
 		view = new ScatterPlotView(model);
 		controller = new ScatterPlotController(view, model);
 	}
 	public ScatterPlot(){
 		model = new ScatterPlotModel();
-		model.readTXTData("RPKM.txt", "Feature ID", "RPKM1", "RPKM2", "COG Category");
+		model.readTXTData("RPKM.txt");
 		view = new ScatterPlotView(model);
 		controller = new ScatterPlotController(view, model);
 	}

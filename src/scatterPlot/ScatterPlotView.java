@@ -62,6 +62,7 @@ import javax.swing.SortOrder;
 import javax.swing.border.BevelBorder;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
 import org.lwjgl.BufferUtils;
@@ -72,6 +73,7 @@ import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.glu.GLU;
 
+import de.matthiasmann.twl.ComboBox;
 import de.matthiasmann.twl.GUI;
 import de.matthiasmann.twl.Label;
 import de.matthiasmann.twl.Widget;
@@ -98,13 +100,11 @@ public class ScatterPlotView extends Widget{
 	//database
 	static ScatterPlotModel spModel;
 	JTable detailTable;
-	static Vector<ExpressionData> rawTable;
 	Vector<String> selectedItems = new Vector<String>();
-	int totalSampleSize = 0;
 	int numOfshowingDots = 0;
 
-	double maxXY;
-	double minXY;
+	double max;
+	double min;
 	double maxX;
 	double maxY;
 
@@ -124,6 +124,8 @@ public class ScatterPlotView extends Widget{
 	//to print text
 	Label toolTipBox = new Label();
 
+	int xIndex = 0;
+	int yIndex = 1;
 
 	//layouts
 	JMenuBar menuBar;
@@ -134,7 +136,6 @@ public class ScatterPlotView extends Widget{
 	//labels
 	Label xAxisLabel = new Label("X");
 	Label yAxisLabel = new Label("Y");
-	Label xyLabel = new Label("X = Y");
 	Label xMaxLabel = new Label();
 	Label yMaxLabel = new Label();
 
@@ -163,13 +164,11 @@ public class ScatterPlotView extends Widget{
 
 	public ScatterPlotView(ScatterPlotModel model){
 		spModel = model;
-		rawTable = spModel.getDataTable();
-
 	}
 	void fileChanged(){
 		updateMinXY();
-		double margin = (maxXY - minXY)/20.0;
-		camera = new Camera(minXY - margin, maxXY + margin, minXY - margin, maxXY + margin, -10, 10);
+		double margin = (max - min)/20.0;
+		camera = new Camera(min - margin, max + margin, min - margin, max + margin, -10, 10);
 		scaleCheckBox.setSelected(true);
 		equalSlider.setMaximum((int)(spModel.getMaxA()*1000));
 		equalSlider.setMinimum(1000);
@@ -178,7 +177,6 @@ public class ScatterPlotView extends Widget{
 		smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
 		smallSlider.setValue(smallSlider.getMinimum());
 		TableModel detailTableModel = new NonEditableTableModel(spModel.getDataTable(), spModel.getColumnNames());
-		totalSampleSize = detailTableModel.getRowCount();
 		detailTable.setModel(detailTableModel);
 		detailTable.setRowSorter(getRowSorter(detailTable));
 		((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
@@ -199,22 +197,18 @@ public class ScatterPlotView extends Widget{
 	}
 	private void updateMinXY(){
 		if(isLogScale){
-			maxXY = log2(Math.max(spModel.getMaxX(), spModel.getMaxY()));
-			minXY = log2(0.1);
-			maxX = log2(spModel.getMaxX());
-			maxY = log2(spModel.getMaxY());
+			max = log2(spModel.getMax());
+			min = log2(0.1);
 		}
 		else{
-			maxXY = Math.max(spModel.getMaxX(), spModel.getMaxY());
-			minXY = 0;
-			maxX = spModel.getMaxX();
-			maxY = spModel.getMaxY();
+			max = spModel.getMin();
+			min = 0;
 		}
 	}
 	public void start() {
 		updateMinXY();
-		double margin = (maxXY - minXY)/20.0;
-		camera = new Camera(minXY - margin, maxXY + margin, minXY - margin, maxXY + margin, -10, 10);
+		double margin = (max - min)/20.0;
+		camera = new Camera(min - margin, max + margin, min - margin, max + margin, -10, 10);
 		makeColorMap();
 		initLayout();
 		try {
@@ -258,9 +252,9 @@ public class ScatterPlotView extends Widget{
 					renderer.syncViewportSize();
 				}
 				if(isLogScale)
-					statusLabel.setText(detailTable.getRowCount()+" out of "+totalSampleSize + " in log scale");
+					statusLabel.setText(detailTable.getRowCount()+" out of "+spModel.getDataTable().size()+ " in log scale");
 				else
-					statusLabel.setText(detailTable.getRowCount()+" out of "+totalSampleSize);
+					statusLabel.setText(detailTable.getRowCount()+" out of "+spModel.getDataTable().size());
 
 				display();
 				mouseClickHandler(Mouse.getX(), Mouse.getY());
@@ -297,14 +291,12 @@ public class ScatterPlotView extends Widget{
             toolTipBox.setBorderSize(1);
             xAxisLabel.setTheme("bigLabel");
             yAxisLabel.setTheme("bigLabel");
-            xyLabel.setTheme("bigLabel");
             xMaxLabel.setTheme("label");
             yMaxLabel.setTheme("label");
 
     		add(toolTipBox);
     		add(xAxisLabel);
     		add(yAxisLabel);
-    		add(xyLabel);
     		add(xMaxLabel);
     		add(yMaxLabel);
     		return gui;
@@ -409,7 +401,6 @@ public class ScatterPlotView extends Widget{
 				}
 			}
 		});
-		totalSampleSize = detailTable.getRowCount();
 		detailTable.setRowSorter(getRowSorter(detailTable));
 
 
@@ -426,8 +417,8 @@ public class ScatterPlotView extends Widget{
 				JCheckBox me = (JCheckBox)e.getSource();
 				isLogScale = me.isSelected();
 				updateMinXY();
-				double margin = (maxXY-minXY)/20.0;
-				camera.setCamera(minXY-margin, maxXY+margin, minXY-margin, maxXY+margin, -10, 10);
+				double margin = (max-min)/20.0;
+				camera.setCamera(min-margin, max+margin, min-margin, max+margin, -10, 10);
 			}
 		});
 		rightPanel.add(scaleCheckBox);
@@ -580,12 +571,12 @@ public class ScatterPlotView extends Widget{
 
 		histogramView.setPreferredSize(new Dimension(getWidth(), 200));
 
-		List<String> categoryNames = new ArrayList<String>(spModel.biggerCategoties.keySet());
+		List<String> categoryNames = new ArrayList<String>(spModel.catetories.keySet());
 		Collections.sort(categoryNames);
 		int categoryWidth = 20;
 		int x = categoryWidth;
 		for(String name : categoryNames){
-			final Category category = spModel.biggerCategoties.get(name);
+			final Category category = spModel.catetories.get(name);
 			PNode categoryNode = PPath.createRectangle(x, 100-category.data.size()/50, categoryWidth, category.data.size()/50);
 			final PText categoryText = new PText(category.category);
 			final PText categoryValue = new PText(category.data.size()+"");
@@ -612,8 +603,8 @@ public class ScatterPlotView extends Widget{
 					}
 					tableFilter.add(2, new RowFilter<Object, Object>(){
 						public boolean include(Entry<? extends Object, ? extends Object> entry) {
-							String categoryName = ((Category)entry.getValue(3)).category.substring(0,1);
-							if(spModel.biggerCategoties.get(categoryName).isActivated)
+							String categoryName = ((Category)entry.getValue(entry.getValueCount()-1)).category.substring(0,1);
+							if(spModel.catetories.get(categoryName).isActivated)
 								return true;
 							else
 								return false;
@@ -737,7 +728,7 @@ public class ScatterPlotView extends Widget{
 		smallSlider.setPaintTicks(true);
 
 		final Hashtable<Integer, JLabel> labelTableLogScale = new Hashtable<Integer, JLabel>();
-		for(int i = (int) log2(spModel.getMin()); i < log2(spModel.getMax()); i ++){
+		for(int i = (int) log2(spModel.getMin()+0.1); i < log2(spModel.getMax()); i ++){
 			labelTableLogScale.put(new Integer(i*1000), new JLabel(i+""));
 		}
 		final Hashtable<Integer, JLabel> labelTableOriginalScale = new Hashtable<Integer, JLabel>();
@@ -802,7 +793,7 @@ public class ScatterPlotView extends Widget{
 				fileDialog.show();
 				File file = fileDialog.getFile();
 				if(file != null){
-					spModel.readTXTData(file.getPath(), "Feature ID", "RPKM1", "RPKM2", "COG Category");
+					spModel.readTXTData(file.getPath());
 					fileChanged();
 				}
 			}
@@ -952,7 +943,7 @@ public class ScatterPlotView extends Widget{
 			else{
 				overedIndex = choose;
 			}
-			toolTipBox.setText(String.format("%s (%.2f, %.2f)",data.getName(), data.getX(), data.getY()));
+			toolTipBox.setText(String.format("%s (%.2f, %.2f)",data.getName(), data.getExp(xIndex), data.getExp(yIndex)));
 		}
 		else{
 			overedIndex = -1;
@@ -985,10 +976,10 @@ public class ScatterPlotView extends Widget{
 
 		if(renderMode != GL11.GL_SELECT){
 			if(isLogScale){
-				drawAxis(log2(Math.max(spModel.getMaxX(), spModel.getMaxX())), isLogScale);
+				drawAxis(log2(Math.max(spModel.getMax(xIndex), spModel.getMax(yIndex))), isLogScale);
 			}
 			else{
-				drawAxis(Math.max(spModel.getMaxX(), spModel.getMaxX()), isLogScale);
+				drawAxis(Math.max(spModel.getMax(xIndex), spModel.getMax(yIndex)), isLogScale);
 			}
 			//drawFilterArea();
 			drawMinMax();
@@ -998,12 +989,12 @@ public class ScatterPlotView extends Widget{
 	double[] getAdjustedLocation(ExpressionData data, boolean isLogScale){
 		double x, y;
 		if(isLogScale){
-			x = log2(data.getX()+0.1);
-			y = log2(data.getY()+0.1);
+			x = log2(data.getExp(xIndex)+0.1);
+			y = log2(data.getExp(yIndex)+0.1);
 		}
 		else{
-			x = data.getX();
-			y = data.getY();
+			x = data.getExp(xIndex);
+			y = data.getExp(yIndex);
 		}
 		 return new double[]{x, y};
 	}
@@ -1026,8 +1017,8 @@ public class ScatterPlotView extends Widget{
 		GL11.glInitNames();
 		Vector<Integer> drawOnTop = new Vector<Integer>();
 
-		for(int i = 0; i < totalSampleSize; i++){
-			ExpressionData data = rawTable.get(i);
+		for(int i = 0; i < spModel.getDataTable().size(); i++){
+			ExpressionData data = spModel.getDataTable().get(i);
 
 			double[] xy = getAdjustedLocation(data, isLogScale);
 
@@ -1043,7 +1034,10 @@ public class ScatterPlotView extends Widget{
 			else{
 				GL11.glPushName(i);
 				GL11.glPointSize(7);
-				Color categoryColor = getColorByCategory(detailTable.getModel().getValueAt(i, 3).toString().substring(0, 1));
+				Color categoryColor = getColorByCategory(detailTable.getModel().getValueAt(i, detailTable.getModel().getColumnCount()-1).toString().substring(0, 1));
+				if(categoryColor == null){
+					categoryColor = Color.black;
+				}
 				GL11.glColor4d(categoryColor.getRed()/255.0, categoryColor.getGreen()/255.0, categoryColor.getBlue()/255.0, data.alpha);
 				GL11.glBegin(GL11.GL_POINTS);
 				GL11.glVertex2d(xy[0], xy[1]);
@@ -1053,7 +1047,7 @@ public class ScatterPlotView extends Widget{
 		}
 		//because we enable alpha blending and z buffering
 		for(Integer i : drawOnTop){
-			ExpressionData data = rawTable.get(i);
+			ExpressionData data = spModel.getDataTable().get(i);
 			double[] xy = getAdjustedLocation(data, isLogScale);
 			GL11.glPushName(i);
 			GL11.glPointSize(14);
@@ -1078,20 +1072,17 @@ public class ScatterPlotView extends Widget{
 		if(isLogScale){
 			GL11.glLineWidth(2);
 			GL11.glBegin(GL11.GL_LINES);
-			GL11.glVertex2d(-maxXY, -maxXY);
-			GL11.glVertex2d(maxXY, maxXY);
+			GL11.glVertex2d(-max, -max);
+			GL11.glVertex2d(max, max);
 			GL11.glEnd();
 		}
 		else{
 			GL11.glLineWidth(2);
 			GL11.glBegin(GL11.GL_LINES);
 			GL11.glVertex2d(0, 0);
-			GL11.glVertex2d(maxXY, maxXY);
+			GL11.glVertex2d(max, max);
 			GL11.glEnd();
 		}
-		int [] pos = getBoundary(maxXY, maxXY, 0);
-		xyLabel.setPosition(pos[0]-50, pos[1]+50);
-
 	}
 	/***
 	 * returns intersection point with boundaries
@@ -1248,7 +1239,7 @@ public class ScatterPlotView extends Widget{
 	private void drawMinMax(){
 		GL11.glColor3d(0, 0, 0);
 		int xpos[] = Translater.getScreenCoordinate((float) maxX, 0, 0);
-		xMaxLabel.setText(String.format("%.2f", spModel.getMaxX()));
+		xMaxLabel.setText(String.format("%.2f", spModel.getMax(xIndex)));
 		xMaxLabel.setPosition(xpos[0], Display.getHeight()-xpos[1]+xMaxLabel.getPreferredHeight()-10);
 		GL11.glBegin(GL11.GL_LINES);
 		GL11.glVertex2d(maxX, -.1);
@@ -1256,7 +1247,7 @@ public class ScatterPlotView extends Widget{
 		GL11.glEnd();
 
 		int ypos[] = Translater.getScreenCoordinate(0, (float) maxY, 0);
-		yMaxLabel.setText(String.format("%.2f", spModel.getMaxY()));
+		yMaxLabel.setText(String.format("%.2f", spModel.getMax(yIndex)));
 		yMaxLabel.setPosition(ypos[0] - yMaxLabel.getPreferredWidth(), Display.getHeight()-ypos[1]);
 		GL11.glBegin(GL11.GL_LINES);
 		GL11.glVertex2d(-.1, maxY);
