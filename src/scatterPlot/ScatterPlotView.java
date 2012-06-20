@@ -175,8 +175,9 @@ public class ScatterPlotView extends Widget{
 	public ScatterPlotView(ScatterPlotModel model){
 		spModel = model;
 	}
-	void fileChanged(){
+	synchronized void fileChanged(){
 		updateMinXY();
+		dimmingPoints.clear();
 		xColumnList.setModel(new DefaultComboBoxModel<String>(spModel.getDataColumnNames()));
 		yColumnList.setModel(new DefaultComboBoxModel<String>(spModel.getDataColumnNames()));
 		double margin = (max - min)/20.0;
@@ -211,22 +212,16 @@ public class ScatterPlotView extends Widget{
 		if(isLogScale){
 			max = log2(spModel.getMax());
 			min = log2(0.1);
+			maxX = spModel.getMax(xIndex);
 		}
 		else{
-			max = spModel.getMin();
+			max = spModel.getMax();
 			min = 0;
+			maxY = spModel.getMax(yIndex);
 		}
 	}
 	public void start() {
 		updateMinXY();
-		int i = 0;
-		ArrayList<ColumnEntry> columns = new ArrayList<ScatterPlotView.ColumnEntry>();
-		for(String s : spModel.getColumnNames()){
-			ColumnEntry c = new ColumnEntry(s, i++);
-			columns.add(c);
-		}
-
-
 		double margin = (max - min)/20.0;
 		camera = new Camera(min - margin, max + margin, min - margin, max + margin, -10, 10);
 		makeColorMap();
@@ -331,7 +326,9 @@ public class ScatterPlotView extends Widget{
 	private void initLayout() {
 		makeMenubar();
 
+		canvasPanel.setLayout(new BoxLayout(canvasPanel, BoxLayout.Y_AXIS));
 
+		JPanel columnPanel = new JPanel();
         xColumnList = new JComboBox<String>(spModel.getDataColumnNames());
         yColumnList = new JComboBox<String>(spModel.getDataColumnNames());
 
@@ -340,18 +337,24 @@ public class ScatterPlotView extends Widget{
 			public void actionPerformed(ActionEvent e) {
 				// TODO Auto-generated method stub
 				xIndex = ((JComboBox)e.getSource()).getSelectedIndex();
+				xAxisLabel.setText((String)xColumnList.getSelectedItem());
+				maxX = spModel.getMax(xIndex);
 			}
 		});
+        xColumnList.setSelectedIndex(xIndex);
         yColumnList.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				// TODO Auto-generated method stub
 				yIndex = ((JComboBox)e.getSource()).getSelectedIndex();
+				yAxisLabel.setText((String)yColumnList.getSelectedItem());
+				maxY = spModel.getMax(yIndex);
 			}
 		});
+        yColumnList.setSelectedIndex(yIndex);
 
-        canvasPanel.add(xColumnList);
-        canvasPanel.add(yColumnList);
+        columnPanel.add(xColumnList);
+        columnPanel.add(yColumnList);
 
 		controlFrame.setPreferredSize(new Dimension(600, 600));
 
@@ -359,9 +362,11 @@ public class ScatterPlotView extends Widget{
 		controlFrame.add(rightPanel);
 
 		//frame.setLayout(new BorderLayout());
+		mainFrame.add(canvasPanel, BorderLayout.CENTER);
+		canvas.setPreferredSize(new java.awt.Dimension(600, 600));
 
 		canvasPanel.add(canvas);
-
+		canvasPanel.add(columnPanel);
 
 		canvas.addComponentListener(new ComponentAdapter() {
 			@Override
@@ -381,13 +386,11 @@ public class ScatterPlotView extends Widget{
 			}
 		});
 
-		mainFrame.add(canvasPanel, BorderLayout.CENTER);
-		canvas.setPreferredSize(new java.awt.Dimension(600, 600));
 
 		JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 		statusPanel.setBorder(new BevelBorder(BevelBorder.LOWERED));
 
-		statusLabel = new JLabel();
+		statusLabel = new JLabel(" ");
 		//statusLabel.setPreferredSize(new Dimension(600, 16));
 
 		statusPanel.add(statusLabel);
@@ -1047,6 +1050,9 @@ public class ScatterPlotView extends Widget{
 
 			GL11.glPointSize(7);
 			Color categoryColor = getColorByCategory(data.getCategory().toString().substring(0, 1));
+			if(categoryColor == null){
+				categoryColor = Color.black;
+			}
 			GL11.glColor4d(categoryColor.getRed()/255.0, categoryColor.getGreen()/255.0, categoryColor.getBlue()/255.0, .1);
 			GL11.glBegin(GL11.GL_POINTS);
 			GL11.glVertex2d(loc[0], loc[1]);
@@ -1204,8 +1210,8 @@ public class ScatterPlotView extends Widget{
 		int xpos[] = getBoundary(maxXY*1.15, 0, 0);
 		int ypos[] = getBoundary(0, maxXY*1.15, 0);
 
-		xAxisLabel.setPosition(xpos[0]-10, xpos[1]+30);
-		yAxisLabel.setPosition(ypos[0]-10, ypos[1]+10);
+		xAxisLabel.setPosition(xpos[0]-xAxisLabel.getPreferredWidth(), xpos[1]+xAxisLabel.getPreferredHeight());
+		yAxisLabel.setPosition(ypos[0]-yAxisLabel.getPreferredWidth(), ypos[1]+yAxisLabel.getPreferredHeight());
 
 	}
 	void drawFilterArea(){
