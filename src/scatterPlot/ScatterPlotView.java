@@ -628,7 +628,9 @@ public class ScatterPlotView extends Widget{
 			}
 		});
 
-		histogramView.setPreferredSize(new Dimension(getWidth(), 200));
+		histogramView.setPreferredSize(new Dimension(getWidth(), 150));
+		histogramView.setMinimumSize(new Dimension(600, 150));
+		histogramView.setMaximumSize(new Dimension(700, 150));
 
 		List<String> categoryNames = new ArrayList<String>(spModel.categories.keySet());
 		Collections.sort(categoryNames);
@@ -636,8 +638,8 @@ public class ScatterPlotView extends Widget{
 		int x = categoryWidth;
 		for(String name : categoryNames){
 			final Category category = spModel.categories.get(name);
-			int h = (int)((double)category.data.size()/spModel.maxCategotySize*histogramView.getPreferredSize().height/2);
-			int y = histogramView.getPreferredSize().height -100 - h;
+			int h = (int)((double)category.data.size()/spModel.maxCategotySize*histogramView.getPreferredSize().height*0.7);
+			int y = histogramView.getPreferredSize().height -30 -  h;
 			PNode categoryNode = PPath.createRectangle(x, y, categoryWidth, h);
 			final PText categoryText = new PText(category.category);
 			final PText categoryValue = new PText(category.data.size()+"");
@@ -645,10 +647,10 @@ public class ScatterPlotView extends Widget{
 
 			categoryNode.addAttribute("name", category.category);
 			categoryNode.setPaint(getColorByCategory(category.category));
-			categoryText.setOffset(x+categoryWidth/2-categoryText.getWidth()/2, y - categoryText.getHeight());
+			categoryText.setOffset(x+categoryWidth/2-categoryText.getWidth()/2, y + h);
 			categoryText.setPickable(false);
 			categoryValue.setScale(0.8);
-			categoryValue.setOffset(x+categoryWidth/2-categoryValue.getWidth()/2, y + h);
+			categoryValue.setOffset(x+categoryWidth/2-categoryValue.getWidth()/2, y - categoryText.getHeight());
 			categoryValue.setTextPaint(Color.gray);
 			categoryValue.setPickable(false);
 
