@@ -37,6 +37,7 @@ import java.util.Comparator;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map.Entry;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
@@ -92,8 +93,10 @@ import edu.umd.cs.piccolo.PNode;
 import edu.umd.cs.piccolo.event.PBasicInputEventHandler;
 import edu.umd.cs.piccolo.event.PInputEvent;
 import edu.umd.cs.piccolo.event.PInputEventListener;
+import edu.umd.cs.piccolo.event.PPanEventHandler;
 import edu.umd.cs.piccolo.nodes.PPath;
 import edu.umd.cs.piccolo.nodes.PText;
+import edu.umd.cs.piccolo.util.PDimension;
 import edu.umd.cs.piccolox.util.PFixedWidthStroke;
 
 public class ScatterPlotView extends Widget{
@@ -585,7 +588,18 @@ public class ScatterPlotView extends Widget{
 	private PCanvas getHistogram() {
 		PCanvas histogramView = new PCanvas();
 
-		histogramView.setPanEventHandler(null);
+		histogramView.setPanEventHandler(new PPanEventHandler(){
+			//override pan method for horizontal only scrolling
+			protected void pan(PInputEvent event) {
+				PCamera c = event.getCamera();
+				Point2D l = event.getPosition();
+				if (c.getViewBounds().contains(l)) {
+					PDimension d = event.getDelta();
+					c.translateView(d.getWidth(), 0);
+				}
+			};
+		});
+		histogramView.getPanEventHandler().setAutopan(false);
 
 
 		final PText tooltipNode = new PText();
@@ -616,23 +630,25 @@ public class ScatterPlotView extends Widget{
 
 		histogramView.setPreferredSize(new Dimension(getWidth(), 200));
 
-		List<String> categoryNames = new ArrayList<String>(spModel.catetories.keySet());
+		List<String> categoryNames = new ArrayList<String>(spModel.categories.keySet());
 		Collections.sort(categoryNames);
 		int categoryWidth = 20;
 		int x = categoryWidth;
 		for(String name : categoryNames){
-			final Category category = spModel.catetories.get(name);
-			PNode categoryNode = PPath.createRectangle(x, 100-category.data.size()/50, categoryWidth, category.data.size()/50);
+			final Category category = spModel.categories.get(name);
+			int h = (int)((double)category.data.size()/spModel.maxCategotySize*histogramView.getPreferredSize().height/2);
+			int y = histogramView.getPreferredSize().height -100 - h;
+			PNode categoryNode = PPath.createRectangle(x, y, categoryWidth, h);
 			final PText categoryText = new PText(category.category);
 			final PText categoryValue = new PText(category.data.size()+"");
 
 
 			categoryNode.addAttribute("name", category.category);
 			categoryNode.setPaint(getColorByCategory(category.category));
-			categoryText.setOffset(x+categoryWidth/2-categoryText.getWidth()/2, 100);
+			categoryText.setOffset(x+categoryWidth/2-categoryText.getWidth()/2, y - categoryText.getHeight());
 			categoryText.setPickable(false);
 			categoryValue.setScale(0.8);
-			categoryValue.setOffset(x+categoryWidth/2-categoryValue.getWidth()/2, 100 - category.data.size()/50-categoryValue.getHeight());
+			categoryValue.setOffset(x+categoryWidth/2-categoryValue.getWidth()/2, y + h);
 			categoryValue.setTextPaint(Color.gray);
 			categoryValue.setPickable(false);
 
@@ -648,8 +664,8 @@ public class ScatterPlotView extends Widget{
 					}
 					tableFilter.add(2, new RowFilter<Object, Object>(){
 						public boolean include(Entry<? extends Object, ? extends Object> entry) {
-							String categoryName = ((Category)entry.getValue(entry.getValueCount()-1)).category.substring(0,1);
-							if(spModel.catetories.get(categoryName).isActivated)
+							String categoryName = ((Category)entry.getValue(entry.getValueCount()-1)).category;
+							if(spModel.categories.get(categoryName).isActivated)
 								return true;
 							else
 								return false;

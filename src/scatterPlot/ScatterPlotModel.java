@@ -10,13 +10,14 @@ import java.util.Vector;
 
 public class ScatterPlotModel {
 	private static Vector<ExpressionData> dataTable;
-	public HashMap<String, Category> catetories;
+	public HashMap<String, Category> categories;
 	private Vector<String> columnNames;
 	private Vector<String> dataColumnNames;
 	private Vector<Double> maxs;
 	private Vector<Double> mins;
 	private double max;
 	private double min;
+	public int maxCategotySize=0;
 
 
 	public Vector<ExpressionData> getDataTable(){
@@ -50,7 +51,7 @@ public class ScatterPlotModel {
 		//initializing
 		columnNames = new Vector<String>();
 		dataTable = new Vector<ExpressionData>();
-		catetories = new HashMap<String, Category>();
+		categories = new HashMap<String, Category>();
 		dataColumnNames = new Vector<String>();
 
 		try {
@@ -79,12 +80,12 @@ public class ScatterPlotModel {
 				for(int i = 0; i < tokens.length-1; i++){
 					expressionData.add(tokens[i]);
 				}
-				Category category = catetories.get(tokens[tokens.length-1]);
+				Category category = categories.get(tokens[tokens.length-1]);
 				if(category == null){
 					category = new Category();
 					category.category = tokens[tokens.length-1];
 				}
-				catetories.put(tokens[tokens.length-1], category);
+				categories.put(tokens[tokens.length-1], category);
 				expressionData.add(category);
 
 				for(int i = 0; i < tokens.length-2; i++){
@@ -113,6 +114,13 @@ public class ScatterPlotModel {
 			for(int i = 1; i < maxs.size(); i++){
 				if(max < maxs.get(i)){
 					max = maxs.get(i);
+				}
+			}
+
+			//max category size
+			for(Category c : categories.values()){
+				if(c.data.size() > maxCategotySize){
+					maxCategotySize = c.data.size();
 				}
 			}
 
