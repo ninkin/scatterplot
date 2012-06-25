@@ -988,7 +988,7 @@ public class ScatterPlotView extends Widget{
 			else if(!Mouse.isButtonDown(0) && isDowned){
 				selectedItems.clear();
 				for(int loop = 0; loop < hits ; loop++){
-					int rowIndex = detailTable.convertRowIndexToView(selectBuff.get(loop*4+3));
+					int rowIndex = detailTable.convertRowIndexToView(choose);
 					selectedItems.add((String) detailTable.getValueAt(rowIndex, 0));
 				}
 				clickedIndex = overedIndex;
@@ -1111,7 +1111,6 @@ public class ScatterPlotView extends Widget{
 				GL11.glPopName();
 			}
 		}
-		//because we enable alpha blending and z buffering
 		for(Integer i : drawOnTop){
 			ExpressionData data = spModel.getDataTable().get(i);
 			double[] xy = getAdjustedLocation(data, isLogScale);
@@ -1304,22 +1303,32 @@ public class ScatterPlotView extends Widget{
 	}
 	private void drawMinMax(){
 		GL11.glColor3d(0, 0, 0);
-		int xpos[] = Translater.getScreenCoordinate((float) maxX, 0, 0);
+		double xmax = spModel.getMax(xIndex);
+		if(isLogScale){
+			xmax = log2(xmax);
+		}
+		int xpos[] = Translater.getScreenCoordinate((float) xmax, 0, 0);
 		xMaxLabel.setText(String.format("%.2f", spModel.getMax(xIndex)));
-		xMaxLabel.setPosition(xpos[0], Display.getHeight()-xpos[1]+xMaxLabel.getPreferredHeight()-10);
+		xMaxLabel.setPosition(xpos[0], Display.getHeight()-xpos[1]+xMaxLabel.getPreferredHeight());
+
+		GL11.glLineWidth(2);
 		GL11.glBegin(GL11.GL_LINES);
-		GL11.glVertex2d(maxX, -.1);
-		GL11.glVertex2d(maxX, .1);
+		GL11.glVertex2d(xmax, -xmax/100);
+		GL11.glVertex2d(xmax, xmax/100);
 		GL11.glEnd();
 
-		int ypos[] = Translater.getScreenCoordinate(0, (float) maxY, 0);
+		double ymax = spModel.getMax(yIndex);
+		if(isLogScale){
+			ymax = log2(ymax);
+		}
+		int ypos[] = Translater.getScreenCoordinate(0, (float)ymax, 0);
 		yMaxLabel.setText(String.format("%.2f", spModel.getMax(yIndex)));
 		yMaxLabel.setPosition(ypos[0] - yMaxLabel.getPreferredWidth(), Display.getHeight()-ypos[1]);
+		GL11.glLineWidth(2);
 		GL11.glBegin(GL11.GL_LINES);
-		GL11.glVertex2d(-.1, maxY);
-		GL11.glVertex2d(.1, maxY);
+		GL11.glVertex2d(-ymax/100, ymax);
+		GL11.glVertex2d(ymax/100, ymax);
 		GL11.glEnd();
-
 
 	}
 	class ColumnEntry{
