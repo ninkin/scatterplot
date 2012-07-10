@@ -184,7 +184,9 @@ public class ScatterPlotView extends Widget{
 		updateMinXY();
 		dimmingPoints.clear();
 		xColumnList.setModel(new DefaultComboBoxModel<String>(spModel.getDataColumnNames()));
+		xColumnList.setSelectedIndex(0);
 		yColumnList.setModel(new DefaultComboBoxModel<String>(spModel.getDataColumnNames()));
+		yColumnList.setSelectedIndex(1);
 		double margin = (max - min)/20.0;
 		camera = new Camera(min - margin, max + margin, min - margin, max + margin, -10, 10);
 		scaleCheckBox.setSelected(true);
