@@ -170,6 +170,8 @@ public class ScatterPlotView extends Widget{
 	File screenShot;
 
 	JLabel statusLabel;
+	
+	boolean nowLoading = false;
 
 
 	//for drawing
@@ -274,8 +276,13 @@ public class ScatterPlotView extends Widget{
 				else
 					statusLabel.setText(detailTable.getRowCount()+" out of "+spModel.getDataTable().size());
 
-				display();
-				mouseClickHandler(Mouse.getX(), Mouse.getY());
+				if(!nowLoading){
+					display();
+					mouseClickHandler(Mouse.getX(), Mouse.getY());
+				}
+				else{
+					displayWhiteScreen();
+				}
 				if(toolTipBox.getText()==null)
 					toolTipBox.setVisible(false);
 				else
@@ -856,8 +863,18 @@ public class ScatterPlotView extends Widget{
 				fileDialog.show();
 				File file = fileDialog.getFile();
 				if(file != null){
+					nowLoading = true;
+					xAxisLabel.setVisible(false);
+					yAxisLabel.setVisible(false);
+					xMaxLabel.setVisible(false);
+					yMaxLabel.setVisible(false);
 					spModel.readTXTData(file.getPath());
 					fileChanged();
+					nowLoading = false;
+					xAxisLabel.setVisible(true);
+					yAxisLabel.setVisible(true);
+					xMaxLabel.setVisible(true);
+					yMaxLabel.setVisible(true);
 				}
 			}
 
@@ -1015,6 +1032,11 @@ public class ScatterPlotView extends Widget{
 				clickedIndex = -1;
 			}
 		}
+	}
+	private void displayWhiteScreen(){
+		GL11.glMatrixMode(GL11.GL_PROJECTION);
+		GL11.glLoadIdentity();
+		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT|GL11.GL_DEPTH_BUFFER_BIT);
 	}
 	private void display(){
 		GL11.glMatrixMode(GL11.GL_PROJECTION);
