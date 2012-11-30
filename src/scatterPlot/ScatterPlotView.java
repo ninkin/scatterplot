@@ -110,8 +110,8 @@ public class ScatterPlotView {
 			4);
 	double smallFilter = log2(0.1);
 	double equalFilter = 1;
-	List<DoubleAndInt> smallSortedDots = new ArrayList<DoubleAndInt>();
-	List<DoubleAndInt> diffSortedDots = new ArrayList<DoubleAndInt>();
+//	List<DoubleAndInt> smallSortedDots = new ArrayList<DoubleAndInt>();
+//	List<DoubleAndInt> diffSortedDots = new ArrayList<DoubleAndInt>();
 	DotFilteringWorker filteringWorker = new DotFilteringWorker();
 	Thread t = new Thread(filteringWorker);
 
@@ -153,13 +153,13 @@ public class ScatterPlotView {
 
 	synchronized void fileChanged() {
 		updateMinXY();
+		dots.clear();
 		xColumnList.setModel(new DefaultComboBoxModel<String>(spModel
 				.getDataColumnNames()));
 		xColumnList.setSelectedIndex(0);
 		yColumnList.setModel(new DefaultComboBoxModel<String>(spModel
 				.getDataColumnNames()));
 		yColumnList.setSelectedIndex(1);
-		double margin = (max - min) / 20.0;
 		scaleCheckBox.setSelected(true);
 		equalSlider.setMaximum((int) (spModel.getMaxA() * 1000));
 		equalSlider.setMinimum(1000);
@@ -180,7 +180,7 @@ public class ScatterPlotView {
 				rightPanel.add(getHistogram());
 			}
 		}
-		rightPanel.revalidate();
+		drawEverything();
 	}
 
 	void initFilters() {
@@ -218,6 +218,12 @@ public class ScatterPlotView {
 	}
 
 	private void drawEverything() {
+		if (dotLayer != null) {
+			canvas.getCamera().removeLayer(dotLayer);
+		}
+		if (axisLayer != null) {
+			canvas.getCamera().removeLayer(axisLayer);
+		}
 		dotLayer = getDotsLayer();
 		axisLayer = getAxisLayer();
 		canvas.getCamera().addLayer(axisLayer);
@@ -306,9 +312,6 @@ public class ScatterPlotView {
 				xAxisLabel.setOffset(dim.getWidth() - xAxisLabel.getWidth(),
 						dim.getHeight());
 				maxX = spModel.getMax(xIndex);
-				if (smallSortedDots.size() != 0) {
-					resort();
-				}
 				resetDots();
 				if (axisLayer != null) {
 					axisLayer.repaint();
@@ -328,9 +331,6 @@ public class ScatterPlotView {
 						yAxisLabel.getWidth());
 				maxY = spModel.getMax(yIndex);
 				resetDots();
-				if (smallSortedDots.size() != 0) {
-					resort();
-				}
 				if (axisLayer != null) {
 					axisLayer.repaint();
 				}
@@ -432,6 +432,7 @@ public class ScatterPlotView {
 		detailTable.setRowSorter(getRowSorter(detailTable));
 
 		JScrollPane tablePane = new JScrollPane(detailTable);
+		tablePane.setPreferredSize(new Dimension(600, 300));
 		rightPanel.add(tablePane);
 
 		scaleCheckBox = new JCheckBox("Log Scale");
@@ -460,10 +461,11 @@ public class ScatterPlotView {
 		rightPanel.add(histogramView);
 	}
 
-	private void resort() {
-		Collections.sort(smallSortedDots, new SmallComp());
-		Collections.sort(diffSortedDots, new DiffComp());
-	}
+	
+//	private void resort() {
+//		Collections.sort(smallSortedDots, new SmallComp());
+//		Collections.sort(diffSortedDots, new DiffComp());
+//	}
 
 	private TableRowSorter<TableModel> getRowSorter(JTable table) {
 		TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(
@@ -610,8 +612,10 @@ public class ScatterPlotView {
 				tableFilter.set(1, new RowFilter<Object, Object>() {
 					public boolean include(
 							Entry<? extends Object, ? extends Object> entry) {
-						double x = Double.parseDouble("" + entry.getValue(1));
-						double y = Double.parseDouble("" + entry.getValue(2));
+						double x = Double.parseDouble(""
+								+ entry.getValue(xIndex + 1));
+						double y = Double.parseDouble(""
+								+ entry.getValue(yIndex + 1));
 						double a;
 						if (x == y) {
 							a = 1;
@@ -903,8 +907,8 @@ public class ScatterPlotView {
 				tableFilter.set(0, new RowFilter<Object, Object>() {
 					public boolean include(
 							Entry<? extends Object, ? extends Object> entry) {
-						int col1 = xColumnList.getSelectedIndex() + 1;
-						int col2 = yColumnList.getSelectedIndex() + 1;
+						int col1 = xIndex + 1;
+						int col2 = yIndex + 1;
 						// +1 은 이름 때문에
 						if (isLogScale) {
 							if (Math.log(Double.parseDouble(""
@@ -1146,12 +1150,12 @@ public class ScatterPlotView {
 			}
 			di.i = i;
 
-			smallSortedDots.add(di);
-			diffSortedDots.add(di);
+//			smallSortedDots.add(di);
+//			diffSortedDots.add(di);
 
 			layer.addChild(dot);
 		}
-		resort();
+//		resort();
 		return layer;
 	}
 
@@ -1280,7 +1284,6 @@ public class ScatterPlotView {
 			}
 		}
 	}
-
 	class DiffComp implements Comparator<DoubleAndInt> {
 		@Override
 		public int compare(DoubleAndInt o1, DoubleAndInt o2) {
