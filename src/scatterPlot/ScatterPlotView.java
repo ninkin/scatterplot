@@ -108,8 +108,7 @@ public class ScatterPlotView {
 			4);
 	double smallFilter = log2(0.1);
 	double equalFilter = 1;
-	// List<DoubleAndInt> smallSortedDots = new ArrayList<DoubleAndInt>();
-	// List<DoubleAndInt> diffSortedDots = new ArrayList<DoubleAndInt>();
+
 	DotFilteringWorker filteringWorker = new DotFilteringWorker();
 	Thread t = new Thread(filteringWorker);
 
@@ -454,10 +453,11 @@ public class ScatterPlotView {
 		rightPanel.add(histogramView);
 	}
 
-	// private void resort() {
-	// Collections.sort(smallSortedDots, new SmallComp());
-	// Collections.sort(diffSortedDots, new DiffComp());
-	// }
+	
+//	private void resort() {
+//		Collections.sort(smallSortedDots, new SmallComp());
+//		Collections.sort(diffSortedDots, new DiffComp());
+//	}
 
 	private TableRowSorter<TableModel> getRowSorter(JTable table) {
 		TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(
@@ -1123,12 +1123,12 @@ public class ScatterPlotView {
 			}
 			di.i = i;
 
-			// smallSortedDots.add(di);
-			// diffSortedDots.add(di);
+//			smallSortedDots.add(di);
+//			diffSortedDots.add(di);
 
 			layer.addChild(dot);
 		}
-		// resort();
+//		resort();
 		return layer;
 	}
 
@@ -1257,7 +1257,6 @@ public class ScatterPlotView {
 			}
 		}
 	}
-
 	class DiffComp implements Comparator<DoubleAndInt> {
 		@Override
 		public int compare(DoubleAndInt o1, DoubleAndInt o2) {
