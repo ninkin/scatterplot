@@ -1,50 +1,39 @@
 package scatterPlot;
+
 import java.awt.BorderLayout;
-import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FileDialog;
 import java.awt.FlowLayout;
 import java.awt.Frame;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.Rectangle;
-import java.awt.TextField;
+import java.awt.Paint;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.geom.Dimension2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Hashtable;
-import java.util.Iterator;
 import java.util.List;
-import java.util.ListIterator;
-import java.util.Map.Entry;
 import java.util.Vector;
-import java.util.concurrent.atomic.AtomicReference;
 
 import javax.imageio.ImageIO;
 import javax.swing.BoxLayout;
-import javax.swing.ComboBoxModel;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
@@ -60,357 +49,317 @@ import javax.swing.JSlider;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
+import javax.swing.Popup;
 import javax.swing.RowFilter;
 import javax.swing.RowSorter;
 import javax.swing.SortOrder;
 import javax.swing.border.BevelBorder;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
-import javax.swing.event.ListDataListener;
-import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.LWJGLException;
-import org.lwjgl.input.Cursor;
-import org.lwjgl.input.Mouse;
-import org.lwjgl.opengl.Display;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.util.glu.GLU;
+import javax.swing.text.html.HTMLDocument.HTMLReader.SpecialAction;
 
-import de.matthiasmann.twl.ComboBox;
-import de.matthiasmann.twl.GUI;
-import de.matthiasmann.twl.Label;
-import de.matthiasmann.twl.Widget;
-import de.matthiasmann.twl.model.ListModel;
-import de.matthiasmann.twl.model.SimpleChangableListModel;
-import de.matthiasmann.twl.model.SimpleListModel;
-import de.matthiasmann.twl.renderer.lwjgl.LWJGLRenderer;
-import de.matthiasmann.twl.theme.ThemeManager;
 import edu.umd.cs.piccolo.PCamera;
 import edu.umd.cs.piccolo.PCanvas;
+import edu.umd.cs.piccolo.PLayer;
 import edu.umd.cs.piccolo.PNode;
 import edu.umd.cs.piccolo.event.PBasicInputEventHandler;
 import edu.umd.cs.piccolo.event.PInputEvent;
-import edu.umd.cs.piccolo.event.PInputEventListener;
 import edu.umd.cs.piccolo.event.PPanEventHandler;
 import edu.umd.cs.piccolo.nodes.PPath;
 import edu.umd.cs.piccolo.nodes.PText;
+import edu.umd.cs.piccolo.util.PAffineTransform;
 import edu.umd.cs.piccolo.util.PDimension;
-import edu.umd.cs.piccolox.util.PFixedWidthStroke;
 
-public class ScatterPlotView extends Widget{
+public class ScatterPlotView {
 	// UI initialize
-	private final static AtomicReference<Dimension> newCanvasSize = new AtomicReference<Dimension>();
 	boolean closeRequested = false;
 
-	//camera
-	private static Camera camera;
-
-	//database
+	// database
 	static ScatterPlotModel spModel;
 	JTable detailTable;
 	Vector<String> selectedItems = new Vector<String>();
-	int numOfshowingDots = 0;
 
 	double max;
 	double min;
 	double maxX;
 	double maxY;
 
-
-	//to picking
-	IntBuffer selectBuff;
-	int renderMode = GL11.GL_RENDER;
-	int clickedIndex =-1;
-	int overedIndex =-1;
-	boolean isDowned = false;
-
-	ThemeManager themeManager;
-
-
+	HTooltipNode tooltip = new HTooltipNode();
 	FileOpenDialog fileDialog = new FileOpenDialog();
-
-	//to print text
-	Label toolTipBox = new Label();
 
 	int xIndex = 0;
 	int yIndex = 1;
-    JComboBox<String> xColumnList;
-    JComboBox<String> yColumnList;
+	JComboBox<String> xColumnList;
+	JComboBox<String> yColumnList;
 
-	//layouts
+	// layouts
 	JMenuBar menuBar;
 	JFrame mainFrame = new JFrame("RPKM Scatterplot");
-	JFrame controlFrame = new JFrame("Control Frame");
-	final Canvas canvas = new Canvas();
-	final JPanel canvasPanel =  new JPanel();
+	final JPanel canvasPanel = new JPanel();
 
-	//labels
-	Label xAxisLabel = new Label("X");
-	Label yAxisLabel = new Label("Y");
-	Label xMaxLabel = new Label();
-	Label yMaxLabel = new Label();
+	// labels
+	PText xAxisLabel = new PText("X");
+	PText yAxisLabel = new PText("Y");
+	PText xMaxLabel = new PText();
+	PText yMaxLabel = new PText();
 
-	//filtering
-	List<RowFilter<Object, Object>> tableFilter = new ArrayList<RowFilter<Object, Object>>(4);
+	// filtering
+	List<RowFilter<Object, Object>> tableFilter = new ArrayList<RowFilter<Object, Object>>(
+			4);
 	double smallFilter = log2(0.1);
 	double equalFilter = 1;
-	ArrayList<ExpressionData> dimmingPoints = new ArrayList<ExpressionData>();
+	List<DoubleAndInt> smallSortedDots = new ArrayList<DoubleAndInt>();
+	List<DoubleAndInt> diffSortedDots = new ArrayList<DoubleAndInt>();
+	DotFilteringWorker filteringWorker = new DotFilteringWorker();
+	Thread t = new Thread(filteringWorker);
+
 	boolean isAdjusting = false;
 	JSlider equalSlider;
 	JSlider smallSlider;
 	JCheckBox scaleCheckBox;
 	JPanel rightPanel;
+	JPopupMenu canvasPopup;
 
-	//is log scale
+	// is log scale
 	boolean isLogScale = true;
 
 	boolean screenShotRequested = false;
-	File screenShot;
 
 	JLabel statusLabel;
-	
+
 	boolean nowLoading = false;
 
+	PCanvas canvas = new PCanvas();
+	PLayer dotLayer;
+	PLayer axisLayer;
+	List<PPath> dots;
+	List<PPath> ticks = new ArrayList<PPath>();
+	TickHandler tickHandler = new TickHandler(ticks);
 
-	//for drawing
+	// for drawing
 	Hashtable<String, Color> colormap = new Hashtable<String, Color>();
 
-	public ScatterPlotView(ScatterPlotModel model){
+	int clickedIndex = -1;
+	private Color clickedColor = Color.black;
+	private Color hoveredColor = Color.black;
+	private int normalRadius = 2;
+	private int hoveredRadius = 5;
+
+	public ScatterPlotView(ScatterPlotModel model) {
 		spModel = model;
 	}
-	synchronized void fileChanged(){
+
+	synchronized void fileChanged() {
 		updateMinXY();
-		dimmingPoints.clear();
-		xColumnList.setModel(new DefaultComboBoxModel<String>(spModel.getDataColumnNames()));
+		xColumnList.setModel(new DefaultComboBoxModel<String>(spModel
+				.getDataColumnNames()));
 		xColumnList.setSelectedIndex(0);
-		yColumnList.setModel(new DefaultComboBoxModel<String>(spModel.getDataColumnNames()));
+		yColumnList.setModel(new DefaultComboBoxModel<String>(spModel
+				.getDataColumnNames()));
 		yColumnList.setSelectedIndex(1);
-		double margin = (max - min)/20.0;
-		camera = new Camera(min - margin, max + margin, min - margin, max + margin, -10, 10);
+		double margin = (max - min) / 20.0;
 		scaleCheckBox.setSelected(true);
-		equalSlider.setMaximum((int)(spModel.getMaxA()*1000));
+		equalSlider.setMaximum((int) (spModel.getMaxA() * 1000));
 		equalSlider.setMinimum(1000);
 		equalSlider.setValue(1000);
-		smallSlider.setMaximum((int)(Math.log(spModel.getMax()+.1)/Math.log(2)*1000));
-		smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
+		smallSlider.setMaximum((int) (Math.log(spModel.getMax() + .1)
+				/ Math.log(2) * 1000));
+		smallSlider.setMinimum((int) (Math.log(.1) / Math.log(2) * 1000));
 		smallSlider.setValue(smallSlider.getMinimum());
-		TableModel detailTableModel = new NonEditableTableModel(spModel.getDataTable(), spModel.getColumnNames());
+		TableModel detailTableModel = new NonEditableTableModel(
+				spModel.getDataTable(), spModel.getColumnNames());
 		detailTable.setModel(detailTableModel);
 		detailTable.setRowSorter(getRowSorter(detailTable));
-		((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
-		for(Component c : rightPanel.getComponents()){
-			if(c instanceof PCanvas){
+		((TableRowSorter<TableModel>) detailTable.getRowSorter())
+				.setRowFilter(RowFilter.andFilter(tableFilter));
+		for (Component c : rightPanel.getComponents()) {
+			if (c instanceof PCanvas) {
 				rightPanel.remove(c);
 				rightPanel.add(getHistogram());
 			}
 		}
 		rightPanel.revalidate();
-}
+	}
 
-	void initFilters(){
+	void initFilters() {
 		tableFilter.add(RowFilter.regexFilter(""));
 		tableFilter.add(RowFilter.regexFilter(""));
 		tableFilter.add(RowFilter.regexFilter(""));
 		tableFilter.add(RowFilter.regexFilter(""));
 	}
-	private void updateMinXY(){
-		if(isLogScale){
+
+	private void updateMinXY() {
+		if (isLogScale) {
 			max = log2(spModel.getMax());
 			min = log2(0.1);
 			maxX = spModel.getMax(xIndex);
-		}
-		else{
+		} else {
 			max = spModel.getMax();
 			min = 0;
 			maxY = spModel.getMax(yIndex);
 		}
 	}
+
 	public void start() {
 		updateMinXY();
-		double margin = (max - min)/20.0;
-		camera = new Camera(min - margin, max + margin, min - margin, max + margin, -10, 10);
 		makeColorMap();
+		initFilters();
 		initLayout();
-		try {
-			canvas.setVisible(true);
-			mainFrame.setVisible(true);
-			controlFrame.setVisible(true);
-			Display.setParent(canvas);
-			Display.setResizable(true);
-			Display.setVSyncEnabled(true);
-			mainFrame.pack();
-			mainFrame.addComponentListener(new ComponentAdapter() {
-				@Override
-				public void componentResized(ComponentEvent e) {
-					// TODO Auto-generated method stub
-					controlFrame.setLocation(mainFrame.getX()+mainFrame.getWidth(), mainFrame.getY());
-				}
+		drawEverything();
 
-				@Override
-				public void componentMoved(ComponentEvent e) {
-					controlFrame.setLocation(mainFrame.getX()+mainFrame.getWidth(), mainFrame.getY());
-				}
-			});
+		canvas.setVisible(true);
+		mainFrame.pack();
 
-			controlFrame.setLocation(mainFrame.getX()+mainFrame.getWidth(), mainFrame.getY());
-			controlFrame.pack();
-			Display.create();
+		mainFrame.setVisible(true);
+		mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-			GUI gui = initTWL();
-			initOpenGL();
-			initFilters();
-
-			LWJGLRenderer renderer = new LWJGLRenderer();
-
-			Dimension newDim;
-
-			while (!Display.isCloseRequested() && ! closeRequested){
-				newDim = newCanvasSize.getAndSet(null);
-
-				if(newDim != null){
-					GL11.glViewport(0, 0, newDim.width, newDim.height);
-					renderer.syncViewportSize();
-				}
-				if(isLogScale)
-					statusLabel.setText(detailTable.getRowCount()+" out of "+spModel.getDataTable().size()+ " in log scale");
-				else
-					statusLabel.setText(detailTable.getRowCount()+" out of "+spModel.getDataTable().size());
-
-				if(!nowLoading){
-					display();
-					mouseClickHandler(Mouse.getX(), Mouse.getY());
-				}
-				else{
-					displayWhiteScreen();
-				}
-				if(toolTipBox.getText()==null)
-					toolTipBox.setVisible(false);
-				else
-					toolTipBox.setVisible(true);
-				toolTipBox.setPosition(Mouse.getX()+20, canvas.getHeight() - Mouse.getY()+10);
-				gui.update();
-				Display.update();
-				if(screenShotRequested == true){
-					saveScreenImage();
-					screenShotRequested = false;
-					screenShot = null;
-				}
-			}
-			Display.destroy();
-			mainFrame.dispose();
-			System.exit(0);
-		} catch (LWJGLException e) {
-			e.printStackTrace();
-		}
 	}
 
-	private GUI initTWL() {
-		LWJGLRenderer renderer;
-		try {
-			renderer = new LWJGLRenderer();
-			GUI gui = new GUI(this, renderer);
-            themeManager = ThemeManager.createThemeManager(getClass().getResource("resources/simple.xml"), renderer);
-            gui.applyTheme(themeManager);
-            toolTipBox.setAutoSize(true);
-            toolTipBox.setTheme("faketooltip");
-            toolTipBox.setBorderSize(1);
-            xAxisLabel.setTheme("bigLabel");
-            yAxisLabel.setTheme("bigLabel");
-            xMaxLabel.setTheme("label");
-            yMaxLabel.setTheme("label");
+	private void drawEverything() {
+		dotLayer = getDotsLayer();
+		axisLayer = getAxisLayer();
+		canvas.getCamera().addLayer(axisLayer);
+		canvas.getCamera().addLayer(dotLayer);
+		canvas.getCamera().addChild(tooltip);
+		Dimension dim = canvas.getPreferredSize();
+		canvas.getCamera().translateView(dim.getWidth() / 10,
+				-dim.getHeight() / 10);
+		canvas.getCamera().addAttribute("initialTransform",
+				canvas.getCamera().getViewTransform());
 
-
-    		add(toolTipBox);
-    		add(xAxisLabel);
-    		add(yAxisLabel);
-    		add(xMaxLabel);
-    		add(yMaxLabel);
-    		return gui;
-		} catch (LWJGLException e1) {
-			e1.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return null;
 	}
+
+	private PLayer getAxisLayer() {
+		PLayer layer = new PLayer();
+		layer.addChild(xAxisLabel);
+		layer.addChild(yAxisLabel);
+		Dimension dim = canvas.getPreferredSize();
+		xAxisLabel.setOffset(dim.getWidth() - xAxisLabel.getWidth(),
+				dim.getHeight());
+		yAxisLabel.rotate(-Math.PI / 2);
+		yAxisLabel.setHorizontalAlignment(JLabel.RIGHT_ALIGNMENT);
+		layer.addChild(PPath.createLine(0, 0, 0, 2 * (float) dim.getHeight()));
+		layer.addChild(PPath.createLine(-(float) dim.getWidth(),
+				(float) dim.getHeight(), (float) dim.getWidth(),
+				(float) dim.getHeight()));
+		layer.addChild(PPath.createLine(-(float) dim.getWidth(),
+				2 * (float) dim.getHeight(), (float) dim.getWidth(), 0));
+		PText xyLine = new PText("Y = X");
+		xyLine.setOffset(dim.getWidth() - 2 * xyLine.getWidth(), 0);
+		layer.addChild(xyLine);
+
+		layer.addChild(yMaxLabel);
+		layer.addChild(xMaxLabel);
+		return layer;
+	}
+
+	private JPopupMenu getCanvasPopup() {
+		JPopupMenu popup = new JPopupMenu();
+		JMenuItem sample = new JMenuItem("Sample");
+		popup.add(sample);
+
+		return popup;
+	}
+
 	private void initLayout() {
 		makeMenubar();
+		canvasPopup = getCanvasPopup();
+		canvas.addInputEventListener(new PBasicInputEventHandler() {
+			@Override
+			public void mouseWheelRotated(PInputEvent event) {
+
+				if (event.getWheelRotation() > 0) {
+					canvas.getCamera().scaleViewAboutPoint(0.8,
+							event.getPosition().getX(),
+							event.getPosition().getY());
+				} else {
+					canvas.getCamera().scaleViewAboutPoint(1 / 0.8,
+							event.getPosition().getX(),
+							event.getPosition().getY());
+				}
+				super.mouseWheelRotated(event);
+			}
+
+			@Override
+			public void mouseClicked(PInputEvent event) {
+				if (event.getButton() == MouseEvent.BUTTON3) {
+					canvasPopup.show((Component) event.getComponent(),
+							(int) event.getCanvasPosition().getX(), (int) event
+									.getCanvasPosition().getY());
+				}
+				super.mouseClicked(event);
+			}
+		});
 
 		canvasPanel.setLayout(new BoxLayout(canvasPanel, BoxLayout.Y_AXIS));
 
 		JPanel columnPanel = new JPanel();
-        xColumnList = new JComboBox<String>(spModel.getDataColumnNames());
-        yColumnList = new JComboBox<String>(spModel.getDataColumnNames());
-
-        xColumnList.addActionListener(new ActionListener() {
+		xColumnList = new JComboBox<String>(spModel.getDataColumnNames());
+		xColumnList.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// TODO Auto-generated method stub
-				xIndex = ((JComboBox)e.getSource()).getSelectedIndex();
-				xAxisLabel.setText((String)xColumnList.getSelectedItem());
+				xIndex = xColumnList.getSelectedIndex();
+				Dimension dim = canvas.getPreferredSize();
+				xAxisLabel.setText((String) xColumnList.getSelectedItem());
+				xAxisLabel.setOffset(dim.getWidth() - xAxisLabel.getWidth(),
+						dim.getHeight());
 				maxX = spModel.getMax(xIndex);
+				if (smallSortedDots.size() != 0) {
+					resort();
+				}
+				resetDots();
+				if (axisLayer != null) {
+					axisLayer.repaint();
+				}
 			}
 		});
-        xColumnList.setSelectedIndex(xIndex);
-        yColumnList.addActionListener(new ActionListener() {
+		xColumnList.setSelectedIndex(xIndex);
+		columnPanel.add(xColumnList);
+
+		yColumnList = new JComboBox<String>(spModel.getDataColumnNames());
+		yColumnList.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// TODO Auto-generated method stub
-				yIndex = ((JComboBox)e.getSource()).getSelectedIndex();
-				yAxisLabel.setText((String)yColumnList.getSelectedItem());
+				yIndex = yColumnList.getSelectedIndex();
+				yAxisLabel.setText((String) yColumnList.getSelectedItem());
+				yAxisLabel.setOffset(-yAxisLabel.getHeight(),
+						yAxisLabel.getWidth());
 				maxY = spModel.getMax(yIndex);
+				resetDots();
+				if (smallSortedDots.size() != 0) {
+					resort();
+				}
+				if (axisLayer != null) {
+					axisLayer.repaint();
+				}
 			}
 		});
-        yColumnList.setSelectedIndex(yIndex);
-
-        columnPanel.add(xColumnList);
-        columnPanel.add(yColumnList);
-
-		controlFrame.setPreferredSize(new Dimension(600, 600));
+		yColumnList.setSelectedIndex(yIndex);
+		columnPanel.add(yColumnList);
 
 		rightPanel = new JPanel();
-		controlFrame.add(rightPanel);
 
-		//frame.setLayout(new BorderLayout());
 		mainFrame.add(canvasPanel, BorderLayout.CENTER);
+		mainFrame.add(rightPanel, BorderLayout.EAST);
 		canvas.setPreferredSize(new java.awt.Dimension(600, 600));
+		canvas.setZoomEventHandler(null);
 
 		canvasPanel.add(canvas);
 		canvasPanel.add(columnPanel);
-
-		canvas.addComponentListener(new ComponentAdapter() {
-			@Override
-			public void componentResized(ComponentEvent e)
-			{ newCanvasSize.set(canvas.getSize()); }
-		});
-		mainFrame.addWindowListener(new WindowAdapter(){
-			@Override
-			public void windowClosing(WindowEvent e){
-				closeRequested = true;
-			}
-		});
-		controlFrame.addWindowListener(new WindowAdapter(){
-			@Override
-			public void windowClosing(WindowEvent e){
-				closeRequested = true;
-			}
-		});
-
 
 		JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 		statusPanel.setBorder(new BevelBorder(BevelBorder.LOWERED));
 
 		statusLabel = new JLabel(" ");
-		//statusLabel.setPreferredSize(new Dimension(600, 16));
 
 		statusPanel.add(statusLabel);
 		mainFrame.add(statusPanel, BorderLayout.SOUTH);
 
 		rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
-		TableModel detailTableModel = new NonEditableTableModel(spModel.getDataTable(), spModel.getColumnNames());
-
+		TableModel detailTableModel = new NonEditableTableModel(
+				spModel.getDataTable(), spModel.getColumnNames());
 
 		detailTable = new JTable(detailTableModel);
 
@@ -420,21 +369,25 @@ public class ScatterPlotView extends Widget{
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				FileDialog fd = new FileDialog(new Frame(), "Save ...", FileDialog.SAVE);
+				FileDialog fd = new FileDialog(new Frame(), "Save ...",
+						FileDialog.SAVE);
 				fd.setVisible(true);
 				try {
-					FileWriter writer = new FileWriter(fd.getDirectory()+fd.getFile());
-					for(int i = 0; i < detailTable.getRowCount(); i++){
-						for(int j = 0; j < detailTable.getColumnCount() ; j++){
-							if(detailTable.getValueAt(i, j) instanceof Double){
-								writer.append(""+((Double) detailTable.getValueAt(i, j)));
-							}
-							else{
-								writer.append(detailTable.getValueAt(i, j).toString());
+					FileWriter writer = new FileWriter(fd.getDirectory()
+							+ fd.getFile());
+					for (int i = 0; i < detailTable.getRowCount(); i++) {
+						for (int j = 0; j < detailTable.getColumnCount(); j++) {
+							if (detailTable.getValueAt(i, j) instanceof Double) {
+								writer.append(""
+										+ ((Double) detailTable
+												.getValueAt(i, j)));
+							} else {
+								writer.append(detailTable.getValueAt(i, j)
+										.toString());
 							}
 							writer.append("\t");
 						}
-						writer.append("\r\n");//\n for linux
+						writer.append("\r\n");// \n for linux
 					}
 					writer.flush();
 					writer.close();
@@ -449,33 +402,50 @@ public class ScatterPlotView extends Widget{
 		detailTable.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
-				if(e.getButton()==MouseEvent.BUTTON1){
-					JTable me = ((JTable)e.getSource());
-					clickedIndex = me.convertRowIndexToModel(me.getSelectedRow());
-				}
-				else if(e.getButton() == MouseEvent.BUTTON3){
+				if (e.getButton() == MouseEvent.BUTTON1) {
+					JTable me = ((JTable) e.getSource());
+					if (clickedIndex != -1) {
+						PPath dot = dots.get(clickedIndex);
+						Color c = (Color) dot.getAttribute("color");
+						dot.setPaint(c);
+						dot.setPathToEllipse(
+								(float) (dot.getX() + dot.getWidth() / 2 - normalRadius),
+								(float) (dot.getY() + dot.getHeight() / 2 - normalRadius),
+								2 * normalRadius, 2 * normalRadius);
+
+					}
+					clickedIndex = me.convertRowIndexToModel(me
+							.getSelectedRow());
+					PPath dot = dots.get(clickedIndex);
+					dot.setPaint(clickedColor);
+					dot.setPathToEllipse(
+							(float) (dot.getX() + dot.getWidth() / 2 - hoveredRadius),
+							(float) (dot.getY() + dot.getHeight() / 2 - hoveredRadius),
+							2 * hoveredRadius, 2 * hoveredRadius);
+					dot.moveToFront();
+					dotLayer.repaint();
+				} else if (e.getButton() == MouseEvent.BUTTON3) {
 					popup.show(e.getComponent(), e.getX(), e.getY());
 				}
 			}
 		});
 		detailTable.setRowSorter(getRowSorter(detailTable));
 
-
-
-
 		JScrollPane tablePane = new JScrollPane(detailTable);
 		rightPanel.add(tablePane);
 
 		scaleCheckBox = new JCheckBox("Log Scale");
 		scaleCheckBox.setSelected(true);
-		scaleCheckBox.addChangeListener(new ChangeListener() {
+		scaleCheckBox.addActionListener(new ActionListener() {
+
 			@Override
-			public void stateChanged(ChangeEvent e) {
-				JCheckBox me = (JCheckBox)e.getSource();
+			public void actionPerformed(ActionEvent e) {
+				JCheckBox me = (JCheckBox) e.getSource();
 				isLogScale = me.isSelected();
 				updateMinXY();
-				double margin = (max-min)/20.0;
-				camera.setCamera(min-margin, max+margin, min-margin, max+margin, -10, 10);
+				resetDots();
+				tickHandler.resetTicks();
+				smallSlider.setValue(smallSlider.getValue());
 			}
 		});
 		rightPanel.add(scaleCheckBox);
@@ -489,18 +459,25 @@ public class ScatterPlotView extends Widget{
 		PCanvas histogramView = getHistogram();
 		rightPanel.add(histogramView);
 	}
+
+	private void resort() {
+		Collections.sort(smallSortedDots, new SmallComp());
+		Collections.sort(diffSortedDots, new DiffComp());
+	}
+
 	private TableRowSorter<TableModel> getRowSorter(JTable table) {
-		TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(table.getModel());
-		sorter.setComparator(0, new Comparator(){
+		TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(
+				table.getModel());
+		sorter.setComparator(0, new Comparator() {
 			@Override
 			public int compare(Object o1, Object o2) {
 				// TODO Auto-generated method stub
 				String i1 = (String) o1;
 				String i2 = (String) o2;
-				for(int i = 0; i < selectedItems.size(); i++){
-					if(selectedItems.get(i).compareTo(i1) == 0)
+				for (int i = 0; i < selectedItems.size(); i++) {
+					if (selectedItems.get(i).compareTo(i1) == 0)
 						return -1;
-					if(selectedItems.get(i).compareTo(i2) == 0)
+					if (selectedItems.get(i).compareTo(i2) == 0)
 						return 1;
 				}
 				return 0;
@@ -512,6 +489,7 @@ public class ScatterPlotView extends Widget{
 		sorter.setSortKeys(sortkeys);
 		return sorter;
 	}
+
 	private JPanel getEqualFilterPanel() {
 		JPanel equalPanel = new JPanel();
 		equalPanel.setLayout(new BoxLayout(equalPanel, BoxLayout.Y_AXIS));
@@ -525,23 +503,22 @@ public class ScatterPlotView extends Widget{
 		equalFilterLabel.setPreferredSize(new Dimension(100, 20));
 		equalSubPanel.add(equalFilterLabel);
 		final IntegerTextField equalTextField = new IntegerTextField();
-		equalSlider = new JSlider(1000, (int)(spModel.getMaxA()*1000), 1000);
+		equalSlider = new JSlider(1000, (int) (spModel.getMaxA() * 1000), 1000);
 
 		/***
 		 * Equal Text Field
 		 */
 		equalTextField.setPreferredSize(new Dimension(100, 20));
 		equalTextField.setHorizontalAlignment(JTextField.RIGHT);
-		equalTextField.addKeyListener(new KeyAdapter(){
-			public void keyPressed(KeyEvent e){
+		equalTextField.addKeyListener(new KeyAdapter() {
+			public void keyPressed(KeyEvent e) {
 				int key = e.getKeyCode();
 				if (key == KeyEvent.VK_ENTER) {
-					try{
+					try {
 						double v = Double.parseDouble(equalTextField.getText());
-						equalSlider.setValue((int) (v*1000));
-					}
-					catch (NumberFormatException e1){
-						return ;
+						equalSlider.setValue((int) (v * 1000));
+					} catch (NumberFormatException e1) {
+						return;
 					}
 				}
 			}
@@ -549,56 +526,126 @@ public class ScatterPlotView extends Widget{
 		equalTextField.setEditable(true);
 		equalSubPanel.add(equalTextField);
 
-
 		equalSlider.addMouseListener(new MouseAdapter() {
 			@Override
-			public void mouseReleased(MouseEvent e){
-				final JSlider me = (JSlider)e.getSource();
-				me.setToolTipText(""+equalFilter);
-				equalTextField.setText(""+me.getValue()/1000.0);
+			public void mouseReleased(MouseEvent e) {
+				final JSlider me = (JSlider) e.getSource();
+				me.setToolTipText("" + equalFilter);
+				equalTextField.setText("" + me.getValue() / 1000.0);
 				isAdjusting = false;
 			}
+
 			@Override
-			public void mousePressed(MouseEvent e){
+			public void mousePressed(MouseEvent e) {
 				isAdjusting = true;
 			}
 		});
-		equalSlider.addChangeListener(new ChangeListener(){
+		equalSlider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent arg0) {
-				JSlider me = (JSlider)arg0.getSource();
-				equalFilter = me.getValue()/1000.0;
-				equalTextField.setText(equalFilter+"");
-				tableFilter.set(1, new RowFilter<Object, Object>(){
-					public boolean include(Entry<? extends Object, ? extends Object> entry) {
-						double x = Double.parseDouble(""+entry.getValue(1));
-						double y = Double.parseDouble(""+entry.getValue(2));
+				JSlider me = (JSlider) arg0.getSource();
+				double prevEqual = equalFilter;
+				equalFilter = me.getValue() / 1000.0;
 
-						if(Math.max(x, y)/Math.min(x, y) > equalFilter)
+				DoubleAndInt dummy = new DoubleAndInt();
+
+				int insertionPoint1;
+				int insertionPoint2;
+
+				// dummy.d = new ArrayList<Double>();
+				// dummy.d.add(1d);
+				// for (int i = 1; i < spModel.getDataColumnNames().size(); i++)
+				// {
+				// dummy.d.add(prevEqual);
+				// }
+				// dummy.i = -1;
+				// insertionPoint1 = Collections.binarySearch(diffSortedDots,
+				// dummy, new DiffComp());
+				// if (insertionPoint1 < 0) {
+				// insertionPoint1 = -(insertionPoint1 + 1);
+				// }
+				//
+				// dummy.d = new ArrayList<Double>();
+				// dummy.d.add(1d);
+				// for (int i = 1; i < spModel.getDataColumnNames().size(); i++)
+				// {
+				// dummy.d.add(equalFilter);
+				// }
+				//
+				// insertionPoint2 = Collections.binarySearch(diffSortedDots,
+				// dummy, new DiffComp());
+				// if (insertionPoint2 < 0) {
+				// insertionPoint2 = -(insertionPoint2 + 1);
+				// }
+				// for (int i = 0; i < insertionPoint2; i++) {
+				// dots.get(smallSortedDots.get(i).i).setVisible(false);
+				// dots.get(smallSortedDots.get(i).i)
+				// .setPaintInvalid(true);
+				// }
+				// for (int i = insertionPoint2; i < dots.size(); i++) {
+				// dots.get(smallSortedDots.get(i).i).setVisible(true );
+				// dots.get(smallSortedDots.get(i).i).repaint();
+				// }
+				// if (insertionPoint1 < insertionPoint2) {
+				// for (int i = insertionPoint1; i < insertionPoint2; i++) {
+				// dots.get(smallSortedDots.get(i).i).setVisible(false);
+				// dots.get(smallSortedDots.get(i).i)
+				// .setPaintInvalid(true);
+				// }
+				// } else {
+				// for (int i = insertionPoint2; i < insertionPoint1; i++) {
+				// dots.get(smallSortedDots.get(i).i).setVisible(true);
+				// dots.get(smallSortedDots.get(i).i).repaint();
+				// }
+				// }
+				try {
+					filteringWorker.setTerminationRequested(true);
+					t.join();
+					t = new Thread(filteringWorker);
+					t.start();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				equalTextField.setText(equalFilter + "");
+				tableFilter.set(1, new RowFilter<Object, Object>() {
+					public boolean include(
+							Entry<? extends Object, ? extends Object> entry) {
+						double x = Double.parseDouble("" + entry.getValue(1));
+						double y = Double.parseDouble("" + entry.getValue(2));
+						double a;
+						if (x == y) {
+							a = 1;
+						} else {
+							a = Math.max(x, y) / Math.min(x, y);
+						}
+
+						if (a >= equalFilter)
 							return true;
 						else
 							return false;
 					}
 				});
-				((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
+				((TableRowSorter<TableModel>) detailTable.getRowSorter())
+						.setRowFilter(RowFilter.andFilter(tableFilter));
 			}
 		});
 		equalSlider.setMajorTickSpacing(1000);
 		equalSlider.setPaintLabels(true);
 		equalSlider.setPaintTicks(true);
 		final Hashtable<Integer, JLabel> equalLabelTable = new Hashtable<Integer, JLabel>();
-		for(int i = 1; i < spModel.getMaxA(); i++){
-			equalLabelTable.put(new Integer(i*1000), new JLabel(i+""));
+		for (int i = 1; i < spModel.getMaxA(); i++) {
+			equalLabelTable.put(new Integer(i * 1000), new JLabel(i + ""));
 		}
 		equalSlider.setLabelTable(equalLabelTable);
 		equalPanel.add(equalSlider);
 		return equalPanel;
 	}
+
 	private PCanvas getHistogram() {
 		PCanvas histogramView = new PCanvas();
 
-		histogramView.setPanEventHandler(new PPanEventHandler(){
-			//override pan method for horizontal only scrolling
+		histogramView.setPanEventHandler(new PPanEventHandler() {
+			// override pan method for horizontal only scrolling
 			protected void pan(PInputEvent event) {
 				PCamera c = event.getCamera();
 				Point2D l = event.getPosition();
@@ -610,25 +657,26 @@ public class ScatterPlotView extends Widget{
 		});
 		histogramView.getPanEventHandler().setAutopan(false);
 
-
 		final PText tooltipNode = new PText();
 		final PCamera pcamera = histogramView.getCamera();
 
 		tooltipNode.setPickable(false);
 		pcamera.addChild(tooltipNode);
 
-		pcamera.addInputEventListener(new PBasicInputEventHandler(){
-			public void mouseMoved(PInputEvent event){
+		pcamera.addInputEventListener(new PBasicInputEventHandler() {
+			public void mouseMoved(PInputEvent event) {
 				updateToolTip(event);
 			}
-			public void mouseDragged(PInputEvent event){
-				updateToolTip(event);
-			}
-			public void updateToolTip(PInputEvent event){
-				PNode n = event.getInputManager().getMouseOver().getPickedNode();
-				String name = (String)n.getAttribute("name");
-				Point2D p = event.getCanvasPosition();
 
+			public void mouseDragged(PInputEvent event) {
+				updateToolTip(event);
+			}
+
+			public void updateToolTip(PInputEvent event) {
+				PNode n = event.getInputManager().getMouseOver()
+						.getPickedNode();
+				String name = (String) n.getAttribute("name");
+				Point2D p = event.getCanvasPosition();
 
 				event.getPath().canvasToLocal(p, pcamera);
 				tooltipNode.setText(name);
@@ -637,62 +685,80 @@ public class ScatterPlotView extends Widget{
 			}
 		});
 
-		histogramView.setPreferredSize(new Dimension(getWidth(), 150));
-		histogramView.setMinimumSize(new Dimension(600, 150));
-		histogramView.setMaximumSize(new Dimension(700, 150));
+		histogramView.setPreferredSize(new Dimension(600, 150));
 
-		List<String> categoryNames = new ArrayList<String>(spModel.categories.keySet());
+		List<String> categoryNames = new ArrayList<String>(
+				spModel.categories.keySet());
 		Collections.sort(categoryNames);
 		int categoryWidth = 20;
 		int x = categoryWidth;
-		for(String name : categoryNames){
+		for (String name : categoryNames) {
 			final Category category = spModel.categories.get(name);
-			int h = (int)((double)category.data.size()/spModel.maxCategotySize*histogramView.getPreferredSize().height*0.7);
-			int y = histogramView.getPreferredSize().height -30 -  h;
+			int h = (int) ((double) category.data.size()
+					/ spModel.maxCategotySize
+					* histogramView.getPreferredSize().height * 0.7);
+			int y = histogramView.getPreferredSize().height - 30 - h;
 			PNode categoryNode = PPath.createRectangle(x, y, categoryWidth, h);
 			final PText categoryText = new PText(category.category);
-			final PText categoryValue = new PText(category.data.size()+"");
-
+			final PText categoryValue = new PText(category.data.size() + "");
 
 			categoryNode.addAttribute("name", category.category);
 			categoryNode.setPaint(getColorByCategory(category.category));
-			categoryText.setOffset(x+categoryWidth/2-categoryText.getWidth()/2, y + h);
+			categoryText.setOffset(
+					x + categoryWidth / 2 - categoryText.getWidth() / 2, y + h);
 			categoryText.setPickable(false);
 			categoryValue.setScale(0.8);
-			categoryValue.setOffset(x+categoryWidth/2-categoryValue.getWidth()/2, y - categoryText.getHeight());
+			categoryValue.setOffset(
+					x + categoryWidth / 2 - categoryValue.getWidth() / 2, y
+							- categoryText.getHeight());
 			categoryValue.setTextPaint(Color.gray);
 			categoryValue.setPickable(false);
 
-			categoryNode.addInputEventListener(new PBasicInputEventHandler(){
-				public void mousePressed(PInputEvent event){
-					super.mousePressed(event);
+			categoryNode.addInputEventListener(new PBasicInputEventHandler() {
+				public void mousePressed(PInputEvent event) {
 					category.toggleActivation();
-					if(category.isActivated){
-						event.getPickedNode().setPaint(getColorByCategory(category.category));
-					}
-					else{
+					if (category.isActivated) {
+						event.getPickedNode().setPaint(
+								getColorByCategory(category.category));
+					} else {
 						event.getPickedNode().setPaint(Color.WHITE);
 					}
-					tableFilter.add(2, new RowFilter<Object, Object>(){
-						public boolean include(Entry<? extends Object, ? extends Object> entry) {
-							String categoryName = ((Category)entry.getValue(entry.getValueCount()-1)).category;
-							if(spModel.categories.get(categoryName).isActivated)
+					tableFilter.add(2, new RowFilter<Object, Object>() {
+						public boolean include(
+								Entry<? extends Object, ? extends Object> entry) {
+							String categoryName = ((Category) entry
+									.getValue(entry.getValueCount() - 1)).category;
+							if (spModel.categories.get(categoryName).isActivated)
 								return true;
 							else
 								return false;
 						}
 					});
-					((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
+					((TableRowSorter<TableModel>) detailTable.getRowSorter())
+							.setRowFilter(RowFilter.andFilter(tableFilter));
+					try {
+						filteringWorker.setTerminationRequested(true);
+						t.join();
+						t = new Thread(filteringWorker);
+						t.start();
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
 				}
-				public void mouseEntered(PInputEvent event){
+
+				public void mouseEntered(PInputEvent event) {
 					super.mouseEntered(event);
-					((PText)event.getPickedNode().getChild(1)).setTextPaint(Color.black);
-					java.awt.Cursor a= new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR);
+					((PText) event.getPickedNode().getChild(1))
+							.setTextPaint(Color.black);
+					java.awt.Cursor a = new java.awt.Cursor(
+							java.awt.Cursor.HAND_CURSOR);
 					event.pushCursor(a);
 				}
-				public void mouseExited(PInputEvent event){
+
+				public void mouseExited(PInputEvent event) {
 					super.mouseExited(event);
-					((PText)event.getPickedNode().getChild(1)).setTextPaint(Color.gray);
+					((PText) event.getPickedNode().getChild(1))
+							.setTextPaint(Color.gray);
 					event.popCursor();
 				}
 			});
@@ -700,13 +766,15 @@ public class ScatterPlotView extends Widget{
 			histogramView.getLayer().addChild(categoryNode);
 			categoryNode.addChild(categoryText);
 			categoryNode.addChild(categoryValue);
-			x += categoryWidth*1.1;
+			x += categoryWidth * 1.1;
 		}
 		return histogramView;
 	}
-	private JPanel getSmallFilterPanel(JCheckBox scaleCheckBox){
+
+	private JPanel getSmallFilterPanel(JCheckBox scaleCheckBox) {
 		JPanel smallSliderPanel = new JPanel();
-		smallSliderPanel.setLayout(new BoxLayout(smallSliderPanel, BoxLayout.Y_AXIS));
+		smallSliderPanel.setLayout(new BoxLayout(smallSliderPanel,
+				BoxLayout.Y_AXIS));
 
 		JPanel smallSubPanel = new JPanel();
 		smallSliderPanel.add(smallSubPanel);
@@ -715,13 +783,13 @@ public class ScatterPlotView extends Widget{
 		smallFilterLabel.setPreferredSize(new Dimension(100, 20));
 		final IntegerTextField smallTextField = new IntegerTextField();
 		smallSlider = new JSlider();
-		if(isLogScale){
-			smallSlider.setMaximum((int)(Math.log(spModel.getMax()+.1)/Math.log(2)*1000));
-			smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
+		if (isLogScale) {
+			smallSlider.setMaximum((int) (Math.log(spModel.getMax() + .1)
+					/ Math.log(2) * 1000));
+			smallSlider.setMinimum((int) (Math.log(.1) / Math.log(2) * 1000));
 			smallSlider.setValue(smallSlider.getMinimum());
-		}
-		else{
-			smallSlider.setMaximum((int)(spModel.getMax()*1000));
+		} else {
+			smallSlider.setMaximum((int) (spModel.getMax() * 1000));
 			smallSlider.setMinimum(0);
 			smallSlider.setValue(smallSlider.getMinimum());
 		}
@@ -730,25 +798,20 @@ public class ScatterPlotView extends Widget{
 		smallSubPanel.add(smallFilterLabel);
 		smallSubPanel.add(smallTextField);
 
-
 		/***
 		 * Small Text Field
 		 */
 		smallTextField.setPreferredSize(new Dimension(100, 20));
 		smallTextField.setHorizontalAlignment(JTextField.RIGHT);
-		smallTextField.addKeyListener(new KeyAdapter(){
-			public void processKeyEvent(KeyEvent e){
-
-			}
-			public void keyPressed(KeyEvent e){
+		smallTextField.addKeyListener(new KeyAdapter() {
+			public void keyPressed(KeyEvent e) {
 				int key = e.getKeyCode();
 				if (key == KeyEvent.VK_ENTER) {
-					try{
+					try {
 						double v = Double.parseDouble(smallTextField.getText());
-						smallSlider.setValue((int) (v*1000));
-					}
-					catch (NumberFormatException e1){
-						return ;
+						smallSlider.setValue((int) (v * 1000));
+					} catch (NumberFormatException e1) {
+						return;
 					}
 				}
 			}
@@ -756,43 +819,117 @@ public class ScatterPlotView extends Widget{
 		smallTextField.setEditable(true);
 		smallTextField.setFocusable(true);
 
-
 		smallSliderPanel.add(smallSlider);
 		smallSlider.addMouseListener(new MouseAdapter() {
 			@Override
-			public void mouseReleased(MouseEvent e){
+			public void mouseReleased(MouseEvent e) {
 				isAdjusting = false;
 			}
+
 			@Override
-			public void mousePressed(MouseEvent e){
+			public void mousePressed(MouseEvent e) {
 				isAdjusting = true;
 			}
 		});
-		smallSlider.addChangeListener(new ChangeListener(){
+		smallSlider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent arg0) {
-				JSlider me = (JSlider)arg0.getSource();
-				smallFilter = me.getValue()/1000.0-.1;
-				tableFilter.set(0, new RowFilter<Object, Object>(){
-					public boolean include(Entry<? extends Object, ? extends Object> entry) {
-						if(isLogScale){
-							if(Math.log(Double.parseDouble(""+entry.getValue(1))+.1)/Math.log(2) > smallFilter &&
-									Math.log(Double.parseDouble(""+entry.getValue(2))+.1)/Math.log(2) > smallFilter)
+				JSlider me = (JSlider) arg0.getSource();
+				double prevSmall = smallFilter;
+				smallFilter = me.getValue() / 1000.0 - .1;
+				DoubleAndInt dummy = new DoubleAndInt();
+
+				int insertionPoint1;
+				int insertionPoint2;
+
+				// if (isLogScale) {
+				// dummy.d = new ArrayList<Double>();
+				// for (int i = 0; i < spModel.getDataColumnNames().size(); i++)
+				// {
+				// dummy.d.add(Math.exp(prevSmall * Math.log(2)) - 0.1);
+				// }
+				// dummy.i = -1;
+				// insertionPoint1 = -(Collections.binarySearch(
+				// smallSortedDots, dummy, new SmallComp()) + 1);
+				//
+				// dummy.d = new ArrayList<Double>();
+				// for (int i = 0; i < spModel.getDataColumnNames().size(); i++)
+				// {
+				// dummy.d.add(Math.exp(smallFilter * Math.log(2)) - 0.1);
+				// }
+				// insertionPoint2 = -(Collections.binarySearch(
+				// smallSortedDots, dummy, new SmallComp()) + 1);
+				// } else {
+				// dummy.d = new ArrayList<Double>();
+				// for (int i = 0; i < spModel.getDataColumnNames().size(); i++)
+				// {
+				// dummy.d.add(prevSmall);
+				// }
+				// dummy.i = -1;
+				// insertionPoint1 = -(Collections.binarySearch(
+				// smallSortedDots, dummy, new SmallComp()) + 1);
+				//
+				// dummy.d = new ArrayList<Double>();
+				// for (int i = 0; i < spModel.getDataColumnNames().size(); i++)
+				// {
+				// dummy.d.add(smallFilter);
+				// }
+				//
+				// insertionPoint2 = -(Collections.binarySearch(
+				// smallSortedDots, dummy, new SmallComp()) + 1);
+				//
+				// }
+				// if (insertionPoint1 < insertionPoint2) {
+				// for (int i = insertionPoint1; i < insertionPoint2; i++) {
+				// dots.get(smallSortedDots.get(i).i).setVisible(false);
+				// dots.get(smallSortedDots.get(i).i)
+				// .setPaintInvalid(true);
+				// }
+				// } else {
+				// for (int i = insertionPoint2; i < insertionPoint1; i++) {
+				// dots.get(smallSortedDots.get(i).i).setVisible(true);
+				// dots.get(smallSortedDots.get(i).i).repaint();
+				// }
+				// }
+				try {
+					filteringWorker.setTerminationRequested(true);
+					t.join();
+					t = new Thread(filteringWorker);
+					t.start();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+
+				tableFilter.set(0, new RowFilter<Object, Object>() {
+					public boolean include(
+							Entry<? extends Object, ? extends Object> entry) {
+						int col1 = xColumnList.getSelectedIndex() + 1;
+						int col2 = yColumnList.getSelectedIndex() + 1;
+						// +1 은 이름 때문에
+						if (isLogScale) {
+							if (Math.log(Double.parseDouble(""
+									+ entry.getValue(col1)) + .1)
+									/ Math.log(2) > smallFilter
+									&& Math.log(Double.parseDouble(""
+											+ entry.getValue(col2)) + .1)
+											/ Math.log(2) > smallFilter)
 								return true;
 							else
 								return false;
-						}
-						else{
-							if(Double.parseDouble(""+entry.getValue(1)) > smallFilter &&
-									Double.parseDouble(""+entry.getValue(2)) > smallFilter)
+						} else {
+							if (Double.parseDouble("" + entry.getValue(col1)) > smallFilter
+									&& Double.parseDouble(""
+											+ entry.getValue(col2)) > smallFilter)
 								return true;
 							else
 								return false;
 						}
 					}
+
 				});
-				((TableRowSorter<TableModel>)detailTable.getRowSorter()).setRowFilter(RowFilter.andFilter(tableFilter));
-				smallTextField.setText(""+me.getValue()/1000.0);
+				((TableRowSorter<TableModel>) detailTable.getRowSorter())
+						.setRowFilter(RowFilter.andFilter(tableFilter));
+				smallTextField.setText("" + me.getValue() / 1000.0);
 			}
 		});
 
@@ -800,71 +937,64 @@ public class ScatterPlotView extends Widget{
 		smallSlider.setPaintTicks(true);
 
 		final Hashtable<Integer, JLabel> labelTableLogScale = new Hashtable<Integer, JLabel>();
-		for(int i = (int) log2(spModel.getMin()+0.1); i < log2(spModel.getMax()); i ++){
-			labelTableLogScale.put(new Integer(i*1000), new JLabel(i+""));
+		for (int i = (int) log2(spModel.getMin() + 0.1); i < log2(spModel
+				.getMax()); i++) {
+			labelTableLogScale.put(new Integer(i * 1000), new JLabel(i + ""));
 		}
 		final Hashtable<Integer, JLabel> labelTableOriginalScale = new Hashtable<Integer, JLabel>();
-		for(int i = 0; i < spModel.getMax(); i+=Math.pow(10, (int)Math.log10(spModel.getMax()))){
-			labelTableOriginalScale.put(new Integer(i*1000), new JLabel(i+""));
+		for (int i = 0; i < spModel.getMax(); i += Math.pow(10,
+				(int) Math.log10(spModel.getMax()))) {
+			labelTableOriginalScale.put(new Integer(i * 1000), new JLabel(i
+					+ ""));
 		}
 
 		smallSlider.setLabelTable(labelTableLogScale);
-		scaleCheckBox.addChangeListener(new ChangeListener() {
+		scaleCheckBox.addActionListener(new ActionListener() {
+
 			@Override
-			public void stateChanged(ChangeEvent e) {
-				JCheckBox me = (JCheckBox)e.getSource();
+			public void actionPerformed(ActionEvent e) {
+
+				JCheckBox me = (JCheckBox) e.getSource();
 				isLogScale = me.isSelected();
-				if(isLogScale){
+				if (isLogScale) {
+					smallSlider.setValue((int) log2(smallSlider.getValue() / 1000.0) * 1000);
 					smallSlider.setLabelTable(labelTableLogScale);
-					smallSlider.setMaximum((int)(Math.log(spModel.getMax()+.1)/Math.log(2)*1000));
-					smallSlider.setMinimum((int)(Math.log(.1)/Math.log(2)*1000));
-					smallSlider.setValue(smallSlider.getMinimum());
-				}
-				else{
+					smallSlider.setMaximum((int) (Math.log(spModel.getMax() + .1)
+							/ Math.log(2) * 1000));
+					smallSlider.setMinimum((int) (Math.log(.1) / Math.log(2) * 1000));
+				} else {
+					smallSlider.setValue((int) (exp2((double) smallSlider
+							.getValue() / 1000) * 1000));
 					smallSlider.setLabelTable(labelTableOriginalScale);
-					smallSlider.setMaximum((int)(spModel.getMax()*1000));
+					smallSlider.setMaximum((int) (spModel.getMax() * 1000));
 					smallSlider.setMinimum(0);
-					smallSlider.setValue(smallSlider.getMinimum());
 				}
 			}
 		});
 		return smallSliderPanel;
 	}
-	private void saveScreenImage(){
-		GL11.glReadBuffer(GL11.GL_FRONT);
-		int width = Display.getWidth();
-		int height= Display.getHeight();
-		int bpp = 4; // Assuming a 32-bit display with a byte each for red, green, blue, and alpha.
-		ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * bpp);
-		GL11.glReadPixels(0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer );
-		BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-		for(int x = 0; x < width; x++)
-			for(int y = 0; y < height; y++)
-			{
-				int i = (x + (width * y)) * bpp;
-				int r = buffer.get(i) & 0xFF;
-				int g = buffer.get(i + 1) & 0xFF;
-				int b = buffer.get(i + 2) & 0xFF;
-				image.setRGB(x, height - (y + 1), (0xFF << 24) | (r << 16) | (g << 8) | b);
-			}
 
+	private void saveScreenImage(File screenShot) {
+		BufferedImage image = (BufferedImage) canvas.getCamera().toImage();
 		try {
 			ImageIO.write(image, "PNG", screenShot);
-		} catch (IOException e2) { e2.printStackTrace(); }
+		} catch (IOException e2) {
+			e2.printStackTrace();
+		}
 
 	}
+
 	private void makeMenubar() {
 		menuBar = new JMenuBar();
 
 		JMenu fileMenu = new JMenu("File");
 		JMenuItem open = new JMenuItem("Open", KeyEvent.VK_O);
-		open.addActionListener(new ActionListener(){
+		open.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// TODO Auto-generated method stub
 				fileDialog.show();
 				File file = fileDialog.getFile();
-				if(file != null){
+				if (file != null) {
 					nowLoading = true;
 					xAxisLabel.setVisible(false);
 					yAxisLabel.setVisible(false);
@@ -884,14 +1014,14 @@ public class ScatterPlotView extends Widget{
 		fileMenu.add(open);
 
 		JMenuItem pngExport = new JMenuItem("Export as PNG");
-		pngExport .addActionListener(new ActionListener() {
+		pngExport.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 
-				FileDialog fd = new FileDialog(new Frame());
+				FileDialog fd = new FileDialog(mainFrame);
 				fd.setVisible(true);
-				screenShot = new File(fd.getDirectory()+fd.getFile());
-				screenShotRequested = true;
+				File screenShot = new File(fd.getDirectory() + fd.getFile());
+				saveScreenImage(screenShot);
 			}
 		});
 		fileMenu.add(pngExport);
@@ -911,13 +1041,15 @@ public class ScatterPlotView extends Widget{
 
 		JMenu cameraMenu = new JMenu("Camera");
 		JMenuItem resetCamera = new JMenuItem("Reset camera", KeyEvent.VK_R);
-		resetCamera.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, ActionEvent.ALT_MASK));
+		resetCamera.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R,
+				ActionEvent.ALT_MASK));
 		resetCamera.addActionListener(new ActionListener() {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// TODO Auto-generated method stub
-				camera.resetCamera();
+				PAffineTransform initialBound = (PAffineTransform) canvas
+						.getCamera().getAttribute("initialTransform");
+				canvas.getCamera().setViewTransform(initialBound);
 			}
 		});
 		cameraMenu.add(resetCamera);
@@ -926,37 +1058,15 @@ public class ScatterPlotView extends Widget{
 
 		JMenu optionMenu = new JMenu("Option");
 		JMenuItem option = new JMenuItem("Option");
-		option.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				// TODO Auto-generated method stub
-				new Option();
-			}
-		});
+		option.addActionListener(tickHandler);
 		optionMenu.add(option);
 		menuBar.add(optionMenu);
 
 		mainFrame.setJMenuBar(menuBar);
 	}
-	private void initOpenGL() {
 
-		selectBuff = BufferUtils.createIntBuffer(1024);
-		GL11.glSelectBuffer(selectBuff);
-
-		GL11.glClearColor(1, 1, 1, 1);
-
-		GL11.glEnable(GL11.GL_NORMALIZE);
-
-
-		GL11.glEnable(GL11.GL_POINT_SMOOTH);
-		GL11.glEnable(GL11.GL_BLEND);
-		GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-
-
-	}
 	private void makeColorMap() {
-		int alpha = 255;
+		int alpha = 200;
 		colormap.put("J", new Color(255, 0, 0, alpha));
 		colormap.put("A", new Color(194, 175, 88, alpha));
 		colormap.put("K", new Color(255, 153, 0, alpha));
@@ -984,384 +1094,282 @@ public class ScatterPlotView extends Widget{
 		colormap.put("S", new Color(0xd6, 0xaa, 0xdf, alpha));
 	}
 
-	void mouseClickHandler(int x, int y){
-		GL11.glRenderMode(GL11.GL_SELECT);
-		renderMode = GL11.GL_SELECT;
-		display();
-		renderMode = GL11.GL_RENDER;
-		int hits = GL11.glRenderMode(GL11.GL_RENDER);
-		if(hits > 0){
-			int depth, choose;
-			choose = selectBuff.get(3);
-			depth = selectBuff.get(1);
-			for(int loop = 1; loop < hits ; loop++){
-				if(selectBuff.get(loop*4+1) < depth){
-					choose = selectBuff.get(loop*4+3);
-					depth = selectBuff.get(loop*4+1);
-				}
-			}
-			ExpressionData data = spModel.getDataTable().get(choose);
-			if(Mouse.isButtonDown(0)){
-				isDowned = true;
-			}
-			else if(!Mouse.isButtonDown(0) && isDowned){
-				selectedItems.clear();
-				for(int loop = 0; loop < hits ; loop++){
-					int rowIndex = detailTable.convertRowIndexToView(choose);
-					selectedItems.add((String) detailTable.getValueAt(rowIndex, 0));
-				}
-				clickedIndex = overedIndex;
-				detailTable.getRowSorter().toggleSortOrder(0);
-				detailTable.getRowSorter().toggleSortOrder(0);
-
-				int index = detailTable.convertRowIndexToView(choose);
-				detailTable.getSelectionModel().setSelectionInterval(0, hits-1);
-				detailTable.scrollRectToVisible(detailTable.getCellRect(index, 0, true));
-				detailTable.repaint();
-
-
-				isDowned = false;
-			}
-			else{
-				overedIndex = choose;
-			}
-			toolTipBox.setText(String.format("%s (%.2f, %.2f)",data.getName(), data.getExp(xIndex), data.getExp(yIndex)));
-		}
-		else{
-			overedIndex = -1;
-			toolTipBox.setText(null);
-			if(Mouse.isButtonDown(0)&&clickedIndex != -1){
-				clickedIndex = -1;
-			}
-		}
-	}
-	private void displayWhiteScreen(){
-		GL11.glMatrixMode(GL11.GL_PROJECTION);
-		GL11.glLoadIdentity();
-		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT|GL11.GL_DEPTH_BUFFER_BIT);
-	}
-	private void display(){
-		GL11.glMatrixMode(GL11.GL_PROJECTION);
-		GL11.glLoadIdentity();
-
-
-		if(renderMode == GL11.GL_SELECT){
-			IntBuffer viewport = BufferUtils.createIntBuffer(16);
-			GL11.glGetInteger(GL11.GL_VIEWPORT, viewport);
-			GLU.gluPickMatrix(Mouse.getX(), Mouse.getY(), 3, 3, viewport);
-		}
-		camera.move();
-
-		GL11.glClear(GL11.GL_COLOR_BUFFER_BIT|GL11.GL_DEPTH_BUFFER_BIT);
-
-		drawDots();
-		if(isAdjusting){
-			drawDimmingDots();
-		}
-		dimmingPoints.clear();
-		camera.getInput();
-
-		if(renderMode != GL11.GL_SELECT){
-			if(isLogScale){
-				drawAxis(log2(Math.max(spModel.getMax(xIndex), spModel.getMax(yIndex))), isLogScale);
-			}
-			else{
-				drawAxis(Math.max(spModel.getMax(xIndex), spModel.getMax(yIndex)), isLogScale);
-			}
-			//drawFilterArea();
-			drawMinMax();
-			drawXYLine(isLogScale);
-		}
-	}
-	double[] getAdjustedLocation(ExpressionData data, boolean isLogScale){
+	double[] getAdjustedLocation(ExpressionData data, boolean isLogScale) {
 		double x, y;
-		if(isLogScale){
-			x = log2(data.getExp(xIndex)+0.1);
-			y = log2(data.getExp(yIndex)+0.1);
-		}
-		else{
+		if (isLogScale) {
+			x = log2(data.getExp(xIndex) + 0.1);
+			y = log2(data.getExp(yIndex) + 0.1);
+		} else {
 			x = data.getExp(xIndex);
 			y = data.getExp(yIndex);
 		}
-		 return new double[]{x, y};
+		return new double[] { x, y };
 	}
-	private void drawDimmingDots(){
-		for(int i = 0; i < dimmingPoints.size(); i++){
-			ExpressionData data = dimmingPoints.get(i);
-			double[] loc = getAdjustedLocation(data, isLogScale);
 
-			GL11.glPointSize(7);
-			Color categoryColor = getColorByCategory(data.getCategory().toString().substring(0, 1));
-			if(categoryColor == null){
+	private PLayer getDotsLayer() {
+		PLayer layer = new PLayer();
+		DotInputListener listener = new DotInputListener();
+		layer.addInputEventListener(listener);
+
+		dots = new ArrayList<PPath>(spModel.getDataTable().size());
+
+		Dimension2D dim = canvas.getPreferredSize();
+		for (int i = 0; i < spModel.getDataTable().size(); i++) {
+			ExpressionData data = spModel.getDataTable().get(i);
+
+			double[] xy = getAdjustedLocation(data, isLogScale);
+			PPath dot = PPath
+					.createEllipse(
+							(float) (xy[0] / (max - min) * dim.getWidth() - normalRadius),
+							(float) (dim.getHeight()
+									- (xy[1] / (max - min) * dim.getHeight()) - normalRadius),
+							2 * normalRadius, 2 * normalRadius);
+			dot.setStroke(null);
+			Color categoryColor = getColorByCategory(detailTable.getModel()
+					.getValueAt(i, detailTable.getModel().getColumnCount() - 1)
+					.toString().substring(0, 1));
+
+			if (categoryColor == null) {
 				categoryColor = Color.black;
 			}
-			GL11.glColor4d(categoryColor.getRed()/255.0, categoryColor.getGreen()/255.0, categoryColor.getBlue()/255.0, .1);
-			GL11.glBegin(GL11.GL_POINTS);
-			GL11.glVertex2d(loc[0], loc[1]);
-			GL11.glEnd();
+			dot.setName(spModel.getDataTable().get(i).getName());
+			dot.addAttribute("index", i);
+			dot.addAttribute("data", data);
+			dot.addAttribute("color", categoryColor);
+			dot.setPaint(categoryColor);
+			dots.add(dot);
+			DoubleAndInt di = new DoubleAndInt();
+			di.d = new ArrayList<Double>();
+			for (int j = 0; j < spModel.getDataColumnNames().size(); j++) {
+				double d = data.getExp(j);
+				di.d.add(d);
+			}
+			di.i = i;
+
+			smallSortedDots.add(di);
+			diffSortedDots.add(di);
+
+			layer.addChild(dot);
 		}
-
-
+		resort();
+		return layer;
 	}
-	private void drawDots() {
-		GL11.glInitNames();
-		Vector<Integer> drawOnTop = new Vector<Integer>();
 
-		for(int i = 0; i < spModel.getDataTable().size(); i++){
-			ExpressionData data = spModel.getDataTable().get(i);
-
-			double[] xy = getAdjustedLocation(data, isLogScale);
-
-			if(detailTable.convertRowIndexToView(i) < 0){
-				dimmingPoints.add(data);
-				continue;
-			}
-
-			if(overedIndex == i||clickedIndex == i){
-				drawOnTop.add(i);
-				continue;
-			}
-			else{
-				GL11.glPushName(i);
-				GL11.glPointSize(7);
-				Color categoryColor = getColorByCategory(detailTable.getModel().getValueAt(i, detailTable.getModel().getColumnCount()-1).toString().substring(0, 1));
-				if(categoryColor == null){
-					categoryColor = Color.black;
-				}
-				GL11.glColor4d(categoryColor.getRed()/255.0, categoryColor.getGreen()/255.0, categoryColor.getBlue()/255.0, data.alpha);
-				GL11.glBegin(GL11.GL_POINTS);
-				GL11.glVertex2d(xy[0], xy[1]);
-				GL11.glEnd();
-				GL11.glPopName();
-			}
-		}
-		for(Integer i : drawOnTop){
-			ExpressionData data = spModel.getDataTable().get(i);
-			double[] xy = getAdjustedLocation(data, isLogScale);
-			GL11.glPushName(i);
-			GL11.glPointSize(14);
-			GL11.glColor3f(0, 0, 0);
-			GL11.glBegin(GL11.GL_POINTS);
-			GL11.glVertex2d(xy[0], xy[1]);
-			GL11.glEnd();
-			GL11.glPopName();
-		}
-
-	}
-	private Color getColorByCategory(String category){
-		if(category.length() > 1){
+	private Color getColorByCategory(String category) {
+		if (category.length() > 1) {
 			category = category.substring(0, 1);
 		}
 
 		return colormap.get(category);
-
 	}
 
-	private void drawXYLine(boolean isLogScale){
-		if(isLogScale){
-			GL11.glLineWidth(2);
-			GL11.glBegin(GL11.GL_LINES);
-			GL11.glVertex2d(-max, -max);
-			GL11.glVertex2d(max, max);
-			GL11.glEnd();
-		}
-		else{
-			GL11.glLineWidth(2);
-			GL11.glBegin(GL11.GL_LINES);
-			GL11.glVertex2d(0, 0);
-			GL11.glVertex2d(max, max);
-			GL11.glEnd();
+	private void resetDots() {
+		Dimension2D dim = canvas.getPreferredSize();
+		if (dots != null) {
+			for (int i = 0; i < dots.size(); i++) {
+				ExpressionData data = spModel.getDataTable().get(i);
+				double[] xy = getAdjustedLocation(data, isLogScale);
+				dots.get(i)
+						.setX((float) (xy[0] / (max - min) * dim.getWidth() - normalRadius));
+				dots.get(i)
+						.setY((float) (dim.getHeight()
+								- (xy[1] / (max - min) * dim.getHeight()) - normalRadius));
+				dots.get(i).setVisible(true);
+			}
+			dotLayer.repaint();
 		}
 	}
-	/***
-	 * returns intersection point with boundaries
-	 * @param x
-	 * @param y
-	 * @param z
-	 * @return
-	 */
-	int []getBoundary(double x, double y, double z){
-		int [] coord = Translater.getScreenCoordinate((float)x, (float)y, (float)z);
-		if(coord[0] > Display.getWidth()){
-			coord[0] = Display.getWidth();
-		}
-		else if(coord[0] < 0){
-			coord[0] = 0;
-		}
-		if(coord[1] > Display.getHeight()){
-			coord[1] = Display.getHeight();
-		}
-		else if(coord[1] < 0){
-			coord[1] = 0;
-		}
-		coord[1] = Display.getHeight() - coord[1];
 
-		return coord;
+	private double log2(double a) {
+		return Math.log(a) / Math.log(2);
 	}
-	private void drawAxis(double maxXY, boolean isLogScale) {
-		if(isLogScale){
-			GL11.glLineWidth(2);
-			GL11.glColor3d(0, 0, 0);
-			GL11.glBegin(GL11.GL_LINES);
-			GL11.glVertex2d(-maxXY*1.1, 0);
-			GL11.glVertex2d(maxXY*1.1, 0);
-			GL11.glVertex2d(0, -maxXY*1.1);
-			GL11.glVertex2d(0, maxXY*1.1);
-			GL11.glEnd();
-			GL11.glLineWidth(1);
-			GL11.glColor4d(0, 0, 0, 0.1);
-			GL11.glBegin(GL11.GL_LINES);
-			if(Option.showTick){
-				for(double i = 0; i < spModel.getMax()*1.1; i = i + Option.tickInterval){
-					GL11.glVertex2d(log2(i), -maxXY);
-					GL11.glVertex2d(log2(i), maxXY);
-					GL11.glVertex2d(-maxXY, log2(i));
-					GL11.glVertex2d(maxXY, log2(i));
-					GL11.glVertex2d(-log2(i), -maxXY);
-					GL11.glVertex2d(-log2(i), maxXY);
-					GL11.glVertex2d(-maxXY, -log2(i));
-					GL11.glVertex2d(maxXY, -log2(i));
+
+	private double exp2(double v) {
+		return Math.exp((Math.log(2) * v));
+	}
+
+	class DotFilteringWorker implements Runnable {
+		public boolean terminationRequested = false;
+
+		@Override
+		public void run() {
+			terminationRequested = false;
+			int visibledots = 0;
+			for (int i = 0; i < dots.size() && !terminationRequested; i++) {
+				int index = Integer.parseInt(dots.get(i).getAttribute("index")
+						.toString());
+				int isFiltered = detailTable.getRowSorter()
+						.convertRowIndexToView(index);
+				if (isFiltered == -1) {
+					dots.get(i).setVisible(false);
+				} else {
+					dots.get(i).setVisible(true);
+					dots.get(i).repaint();
+					visibledots++;
 				}
 			}
-			GL11.glEnd();
+			statusLabel.setText(String.format("%d / %d", visibledots,
+					dots.size()));
 		}
-		else{
-			GL11.glLineWidth(2);
-			GL11.glColor3d(0, 0, 0);
-			GL11.glBegin(GL11.GL_LINES);
-			GL11.glVertex2d(0, 0);
-			GL11.glVertex2d(maxXY*1.1, 0);
-			GL11.glVertex2d(0, 0);
-			GL11.glVertex2d(0, maxXY*1.1);
-			GL11.glEnd();
-			GL11.glLineWidth(1);
-			GL11.glColor4d(0, 0, 0, 0.1);
-			GL11.glBegin(GL11.GL_LINES);
-			if(Option.showTick){
-				for(double i = 0; i < maxXY*1.1; i = i + Option.tickInterval){
-					GL11.glVertex2d(i, 0);
-					GL11.glVertex2d(i, maxXY*1.1);
-					GL11.glVertex2d(0, i);
-					GL11.glVertex2d(maxXY*1.1, i);
+
+		public void setTerminationRequested(boolean terminationRequested) {
+			this.terminationRequested = terminationRequested;
+		}
+	}
+
+	class DotInputListener extends PBasicInputEventHandler {
+		@Override
+		public void mouseEntered(PInputEvent event) {
+			if (event.getPickedNode() instanceof PPath) {
+				PPath dot = (PPath) event.getPickedNode();
+				dot.setPathToEllipse(
+						(float) (dot.getX() + dot.getWidth() / 2 - hoveredRadius),
+						(float) (dot.getY() + dot.getHeight() / 2 - hoveredRadius),
+						2 * hoveredRadius, 2 * hoveredRadius);
+				dot.moveToFront();
+				dot.setPaint(hoveredColor);
+				tooltip.setText(dot.getName());
+				Point2D p = event.getCanvasPosition();
+				tooltip.setOffset(p.getX() + 10, p.getY() + 10);
+				tooltip.setVisible(true);
+			}
+		}
+
+		@Override
+		public void mouseClicked(PInputEvent event) {
+			if (event.getPickedNode() instanceof PPath) {
+				PPath dot = (PPath) event.getPickedNode();
+				int i = detailTable.convertRowIndexToView((Integer) dot
+						.getAttribute("index"));
+				detailTable.getSelectionModel().setSelectionInterval(i, i);
+				detailTable.scrollRectToVisible(detailTable.getCellRect(i, 0,
+						true));
+				detailTable.repaint();
+			}
+		};
+
+		@Override
+		public void mouseExited(PInputEvent event) {
+			if (event.getPickedNode() instanceof PPath) {
+				PPath dot = (PPath) event.getPickedNode();
+				dot.setPathToEllipse(
+						(float) (dot.getX() + dot.getWidth() / 2 - normalRadius),
+						(float) (dot.getY() + dot.getHeight() / 2 - normalRadius),
+						2 * normalRadius, 2 * normalRadius);
+				dot.setPaint((Paint) dot.getAttribute("color"));
+				tooltip.setVisible(false);
+			}
+		}
+	}
+
+	class DoubleAndInt {
+		public List<Double> d;
+		public int i;
+	}
+
+	class SmallComp implements Comparator<DoubleAndInt> {
+
+		@Override
+		public int compare(DoubleAndInt o1, DoubleAndInt o2) {
+			double min1 = Math.min(o1.d.get(xIndex), o1.d.get(yIndex));
+			double min2 = Math.min(o2.d.get(xIndex), o2.d.get(yIndex));
+			if (min1 < min2) {
+				return -1;
+			} else {
+				return 1;
+			}
+		}
+	}
+
+	class DiffComp implements Comparator<DoubleAndInt> {
+		@Override
+		public int compare(DoubleAndInt o1, DoubleAndInt o2) {
+			double d11 = o1.d.get(xIndex);
+			double d12 = o1.d.get(yIndex);
+			double d21 = o2.d.get(xIndex);
+			double d22 = o2.d.get(yIndex);
+			double a1, a2;
+			if (d11 == d12) {
+				a1 = 1;
+			} else {
+				a1 = Math.max(d11, d12) / Math.min(d11, d12);
+			}
+
+			if (d21 == d22) {
+				a2 = 1;
+			} else {
+				a2 = Math.max(d21, d22) / Math.min(d21, d22);
+			}
+
+			if (a1 <= a2) {
+				return -1;
+			} else {
+				return 1;
+			}
+		}
+	}
+
+	class TickHandler implements ActionListener {
+		List<PPath> ticks;
+		double interval;
+		Option opt = new Option(mainFrame, "Option", true);
+
+		public TickHandler(List<PPath> ticks) {
+			this.ticks = ticks;
+		}
+
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			opt.setVisible(true);
+			interval = opt.tickInterval;
+			if (opt.isOK) {
+				if (opt.showTick) {
+					drawTicks();
+				} else {
+					removeTicks();
 				}
 			}
-			GL11.glEnd();
 		}
 
-		int xpos[] = getBoundary(maxXY*1.15, 0, 0);
-		int ypos[] = getBoundary(0, maxXY*1.15, 0);
-
-		xAxisLabel.setPosition(xpos[0]-xAxisLabel.getPreferredWidth(), xpos[1]+xAxisLabel.getPreferredHeight());
-		yAxisLabel.setPosition(ypos[0]-yAxisLabel.getPreferredWidth(), ypos[1]+yAxisLabel.getPreferredHeight());
-
-	}
-	void drawFilterArea(){
-		//draw small
-		GL11.glColor4d(1, 0, 0, 0.2);
-		GL11.glBegin(GL11.GL_QUADS);
-		if(isLogScale){
-			GL11.glVertex2d(log2(0.1), log2(0.1));
-			GL11.glVertex2d(smallFilter, smallFilter);
-			GL11.glVertex2d(log2(spModel.getMax()), smallFilter);
-			GL11.glVertex2d(log2(spModel.getMax()), log2(.1));
-
-			GL11.glVertex2d(log2(0.1), log2(0.1));
-			GL11.glVertex2d(smallFilter, smallFilter);
-			GL11.glVertex2d(smallFilter, log2(spModel.getMax()));
-			GL11.glVertex2d(log2(.1), log2(spModel.getMax()));
-
-		}
-		else{
-			GL11.glVertex2d(0, 0);
-			GL11.glVertex2d(smallFilter, smallFilter);
-			GL11.glVertex2d(spModel.getMax(), smallFilter);
-			GL11.glVertex2d(spModel.getMax(), 0);
-
-			GL11.glVertex2d(0, 0);
-			GL11.glVertex2d(smallFilter, smallFilter);
-			GL11.glVertex2d(smallFilter, spModel.getMax());
-			GL11.glVertex2d(0, spModel.getMax());
-		}
-		GL11.glEnd();
-
-
-		//draw equal
-		GL11.glColor3d(0.8, 0.8, 1);
-		GL11.glBegin(GL11.GL_TRIANGLES);
-		if(isLogScale){
-			double prev = 2;
-			for(double i = 2; i < spModel.getMax(); i+= 2){
-				GL11.glVertex2d(log2(0.1), log2(0.1));
-				GL11.glVertex2d(log2(prev), log2(prev*equalFilter));
-				GL11.glVertex2d(log2(i), log2(i*equalFilter));
-
-				GL11.glVertex2d(log2(0.1), log2(0.1));
-				GL11.glVertex2d(log2(prev*equalFilter), log2(prev));
-				GL11.glVertex2d(log2(i*equalFilter), log2(i));
-
-				prev = i;
-
+		public void resetTicks() {
+			if (opt.showTick) {
+				drawTicks();
+			} else {
+				removeTicks();
 			}
-			GL11.glVertex2d(log2(0.1), log2(0.1));
-			GL11.glVertex2d(log2(spModel.getMax()), log2(spModel.getMax()));
-			GL11.glVertex2d(log2(spModel.getMax()), log2(spModel.getMax()*equalFilter));
-			GL11.glVertex2d(log2(0.1), log2(0.1));
-			GL11.glVertex2d(log2(spModel.getMax()), log2(spModel.getMax()));
-			GL11.glVertex2d(log2(spModel.getMax()*equalFilter), log2(spModel.getMax()));
-
 		}
-		else{
-			GL11.glVertex2d(0, 0);
-			GL11.glVertex2d(spModel.getMax(), spModel.getMax());
-			GL11.glVertex2d(spModel.getMax(), spModel.getMax()*equalFilter);
 
-			GL11.glVertex2d(0, 0);
-			GL11.glVertex2d(spModel.getMax(), spModel.getMax());
-			GL11.glVertex2d(spModel.getMax(), spModel.getMax()/equalFilter);
+		public void drawTicks() {
+			removeTicks();
+
+			Dimension dim = canvas.getPreferredSize();
+			double x = 0, y;
+			for (int i = 0; i * interval < maxX; i++) {
+				if (isLogScale) {
+					x = log2(i * interval + 0.1) / (max - min) * dim.width;
+					y = dim.getHeight();
+				} else {
+					x = i * interval / (max - min) * dim.width;
+					y = dim.getHeight();
+				}
+				PPath tick1 = PPath.createLine((float) x, (float) y - 5,
+						(float) x, (float) y + 5);
+				ticks.add(tick1);
+				axisLayer.addChild(tick1);
+
+				PPath tick2 = PPath.createLine(-5, dim.height - (float) x, 5,
+						dim.height - (float) x);
+				ticks.add(tick2);
+				axisLayer.addChild(tick2);
+			}
+			axisLayer.invalidatePaint();
 		}
-		GL11.glEnd();
 
-	}
-	private double log2(double a){
-		return Math.log(a)/Math.log(2);
-	}
-	private void drawMinMax(){
-		GL11.glColor3d(0, 0, 0);
-		double xmax = spModel.getMax(xIndex);
-		if(isLogScale){
-			xmax = log2(xmax);
-		}
-		int xpos[] = Translater.getScreenCoordinate((float) xmax, 0, 0);
-		xMaxLabel.setText(String.format("%.2f", spModel.getMax(xIndex)));
-		xMaxLabel.setPosition(xpos[0], Display.getHeight()-xpos[1]+xMaxLabel.getPreferredHeight());
-
-		GL11.glLineWidth(2);
-		GL11.glBegin(GL11.GL_LINES);
-		GL11.glVertex2d(xmax, -xmax/100);
-		GL11.glVertex2d(xmax, xmax/100);
-		GL11.glEnd();
-
-		double ymax = spModel.getMax(yIndex);
-		if(isLogScale){
-			ymax = log2(ymax);
-		}
-		int ypos[] = Translater.getScreenCoordinate(0, (float)ymax, 0);
-		yMaxLabel.setText(String.format("%.2f", spModel.getMax(yIndex)));
-		yMaxLabel.setPosition(ypos[0] - yMaxLabel.getPreferredWidth(), Display.getHeight()-ypos[1]);
-		GL11.glLineWidth(2);
-		GL11.glBegin(GL11.GL_LINES);
-		GL11.glVertex2d(-ymax/100, ymax);
-		GL11.glVertex2d(ymax/100, ymax);
-		GL11.glEnd();
-
-	}
-	class ColumnEntry{
-		final String columnName;
-		final int i;
-		public ColumnEntry(String columnName, int i){
-			this.columnName = columnName;
-			this.i = i;
+		public void removeTicks() {
+			for (int i = 0; i < ticks.size(); i++) {
+				ticks.get(i).removeFromParent();
+			}
+			ticks.clear();
 		}
 	}
 }
-

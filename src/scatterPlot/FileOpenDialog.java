@@ -16,7 +16,6 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.filechooser.FileFilter;
 
-import de.matthiasmann.twl.BoxLayout;
 
 public class FileOpenDialog{
 

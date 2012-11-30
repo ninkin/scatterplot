@@ -27,13 +27,10 @@ public class ScatterPlot implements Runnable {
 	}
 	public static void main(String[] args){
 		new ScatterPlot();
-		view.setVisible(true);
 		view.start();
 	}
 	@Override
 	public void run() {
-		// TODO Auto-generated method stub
-		view.setVisible(true);
 		view.start();
 	}
 

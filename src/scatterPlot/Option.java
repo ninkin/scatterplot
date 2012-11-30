@@ -1,6 +1,8 @@
 package scatterPlot;
 
+import java.awt.Dialog;
 import java.awt.Dimension;
+import java.awt.Frame;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentEvent;
@@ -8,6 +10,7 @@ import java.awt.event.ComponentListener;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
@@ -15,16 +18,16 @@ import javax.swing.JTextField;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
+public class Option extends JDialog {
+	public boolean showTick = false;
+	public double tickInterval = 1000;
+	public boolean isOK = false;
+	Option me;
 
-public class Option {
-	static boolean showTick = false;
-	static double tickInterval = 1000;
-	public Option(){
-		final JFrame optionFrame = new JFrame();
+	public Option(Frame owner, String title, boolean modal) {
+		super(owner, title, modal);
+		me = this;
 		JPanel panel = new JPanel();
-		optionFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-
-
 
 		final JCheckBox showTickCheck = new JCheckBox("Show Tick on the Axises");
 		showTickCheck.setSelected(showTick);
@@ -32,7 +35,7 @@ public class Option {
 
 		final IntegerTextField intervalField = new IntegerTextField();
 		intervalField.setHorizontalAlignment(JTextField.RIGHT);
-		intervalField.setText(tickInterval+"");
+		intervalField.setText(tickInterval + "");
 		intervalField.setPreferredSize(new Dimension(100, 20));
 
 		panel.add(intervalField);
@@ -42,10 +45,10 @@ public class Option {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// TODO Auto-generated method stub
 				showTick = showTickCheck.isSelected();
 				tickInterval = Double.parseDouble(intervalField.getText());
-				optionFrame.dispose();
+				isOK = true;
+				me.dispose();
 			}
 		});
 		panel.add(submit);
@@ -55,14 +58,12 @@ public class Option {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// TODO Auto-generated method stub
-				optionFrame.dispose();
+				me.dispose();
 			}
 		});
 		panel.add(cancel);
 
-		optionFrame.add(panel);
-		optionFrame.setVisible(true);
-		optionFrame.pack();
+		me.add(panel);
+		me.pack();
 	}
 }
