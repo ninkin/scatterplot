@@ -1,4 +1,5 @@
 package scatterPlot;
+
 import java.awt.Color;
 
 import edu.umd.cs.piccolo.PNode;
@@ -34,7 +35,6 @@ public class HTooltipNode extends PNode {
 		this.addChild(tooltiptext);
 	}
 
-	
 	/**
 	 * set tooltip text with certain string.
 	 * 

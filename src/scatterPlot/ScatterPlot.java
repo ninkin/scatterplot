@@ -7,28 +7,32 @@ public class ScatterPlot implements Runnable {
 	static ScatterPlotView view;
 	static ScatterPlotController controller;
 
-	public ScatterPlot(Vector<Vector <Object>> data){
+	public static void main(String[] args) {
+		new ScatterPlot();
+		view.start();
+	}
+
+	public ScatterPlot() {
 		model = new ScatterPlotModel();
 		model.readTXTData("RPKM.txt");
 		view = new ScatterPlotView(model);
 		controller = new ScatterPlotController(view, model);
 	}
-	public ScatterPlot(String input){
+
+	public ScatterPlot(String input) {
 		model = new ScatterPlotModel();
 		model.readTXTData(input);
 		view = new ScatterPlotView(model);
 		controller = new ScatterPlotController(view, model);
 	}
-	public ScatterPlot(){
+
+	public ScatterPlot(Vector<Vector<Object>> data) {
 		model = new ScatterPlotModel();
 		model.readTXTData("RPKM.txt");
 		view = new ScatterPlotView(model);
 		controller = new ScatterPlotController(view, model);
 	}
-	public static void main(String[] args){
-		new ScatterPlot();
-		view.start();
-	}
+
 	@Override
 	public void run() {
 		view.start();

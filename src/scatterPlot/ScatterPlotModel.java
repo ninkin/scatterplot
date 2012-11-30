@@ -1,12 +1,11 @@
 package scatterPlot;
+
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Vector;
-
 
 public class ScatterPlotModel {
 	private static Vector<ExpressionData> dataTable;
@@ -17,38 +16,48 @@ public class ScatterPlotModel {
 	private Vector<Double> mins;
 	private double max;
 	private double min;
-	public int maxCategotySize=0;
+	public int maxCategotySize = 0;
 
-
-	public Vector<ExpressionData> getDataTable(){
-		return dataTable;
-	}
-	public double getMin(){
-
-		return min;
-	}
-	public double getMax(){
-
-		return max;
-	}
-	public double getMin(int index){
-		return mins.get(index);
-	}
-	public double getMax(int index){
-		return maxs.get(index);
-	}
-	public double getMaxA(){
-		return 10;
-	}
-	public Vector<String> getDataColumnNames(){
-		return dataColumnNames;
-	}
-	public Vector<String> getColumnNames(){
+	public Vector<String> getColumnNames() {
 		return columnNames;
 	}
 
-	public void readTXTData(String filename){
-		//initializing
+	public Vector<String> getDataColumnNames() {
+		return dataColumnNames;
+	}
+
+	public Vector<ExpressionData> getDataTable() {
+		return dataTable;
+	}
+
+	public double getMax() {
+
+		return max;
+	}
+
+	public double getMax(int index) {
+		return maxs.get(index);
+	}
+
+	public double getMaxA() {
+		return 10;
+	}
+
+	public double getMin() {
+
+		return min;
+	}
+
+	public double getMin(int index) {
+		return mins.get(index);
+	}
+
+	public void readData() {
+
+	}
+
+	public void readTXTData(String filename) {
+		// initializing
 		columnNames = new Vector<String>();
 		dataTable = new Vector<ExpressionData>();
 		categories = new HashMap<String, Category>();
@@ -59,41 +68,41 @@ public class ScatterPlotModel {
 			String buffer;
 			buffer = in.readLine();
 			String[] tokens = buffer.split("\t");
-			for(int i = 0; i < tokens.length; i++){
+			for (int i = 0; i < tokens.length; i++) {
 				columnNames.add(tokens[i]);
 			}
-			for(int i = 1; i < tokens.length-1; i++){
+			for (int i = 1; i < tokens.length - 1; i++) {
 				dataColumnNames.add(tokens[i]);
 			}
-			maxs = new Vector<Double>(columnNames.size()-2);
-			for(int i = 0; i < columnNames.size() - 2; i++){
+			maxs = new Vector<Double>(columnNames.size() - 2);
+			for (int i = 0; i < columnNames.size() - 2; i++) {
 				maxs.add(Double.MIN_VALUE);
 			}
-			mins = new Vector<Double>(columnNames.size()-2);
-			for(int i = 0; i < columnNames.size() - 2; i++){
+			mins = new Vector<Double>(columnNames.size() - 2);
+			for (int i = 0; i < columnNames.size() - 2; i++) {
 				mins.add(Double.MAX_VALUE);
 			}
 
-			while((buffer = in.readLine()) != null){
+			while ((buffer = in.readLine()) != null) {
 				Vector<Object> expressionData = new Vector<Object>();
 				tokens = buffer.split("\t");
-				for(int i = 0; i < tokens.length-1; i++){
+				for (int i = 0; i < tokens.length - 1; i++) {
 					expressionData.add(tokens[i]);
 				}
-				Category category = categories.get(tokens[tokens.length-1]);
-				if(category == null){
+				Category category = categories.get(tokens[tokens.length - 1]);
+				if (category == null) {
 					category = new Category();
-					category.category = tokens[tokens.length-1];
+					category.category = tokens[tokens.length - 1];
 				}
-				categories.put(tokens[tokens.length-1], category);
+				categories.put(tokens[tokens.length - 1], category);
 				expressionData.add(category);
 
-				for(int i = 0; i < tokens.length-2; i++){
-					double d = Double.parseDouble(tokens[i+1]);
-					if(mins.get(i) > d){
+				for (int i = 0; i < tokens.length - 2; i++) {
+					double d = Double.parseDouble(tokens[i + 1]);
+					if (mins.get(i) > d) {
 						mins.set(i, d);
 					}
-					if(maxs.get(i) < d){
+					if (maxs.get(i) < d) {
 						maxs.set(i, d);
 					}
 				}
@@ -105,25 +114,24 @@ public class ScatterPlotModel {
 			}
 
 			min = mins.get(0);
-			for(int i = 1; i < mins.size(); i++){
-				if(min > mins.get(i)){
+			for (int i = 1; i < mins.size(); i++) {
+				if (min > mins.get(i)) {
 					min = mins.get(i);
 				}
 			}
 			max = maxs.get(0);
-			for(int i = 1; i < maxs.size(); i++){
-				if(max < maxs.get(i)){
+			for (int i = 1; i < maxs.size(); i++) {
+				if (max < maxs.get(i)) {
 					max = maxs.get(i);
 				}
 			}
 
-			//max category size
-			for(Category c : categories.values()){
-				if(c.data.size() > maxCategotySize){
+			// max category size
+			for (Category c : categories.values()) {
+				if (c.data.size() > maxCategotySize) {
 					maxCategotySize = c.data.size();
 				}
 			}
-
 
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
@@ -132,9 +140,5 @@ public class ScatterPlotModel {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	}
-
-	public void readData(){
-
 	}
 }

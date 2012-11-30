@@ -8,14 +8,18 @@ public class Category {
 	public Color color;
 	public String category;
 	public Vector<ExpressionData> data = new Vector<ExpressionData>();
-	public String toString(){
-		return category;
-	}
-	public void addData(ExpressionData data){
+
+	public void addData(ExpressionData data) {
 		this.data.add(data);
 	}
-	public void toggleActivation(){
+
+	public void toggleActivation() {
 		isActivated = !isActivated;
+	}
+
+	@Override
+	public String toString() {
+		return category;
 	}
 
 }

@@ -1,22 +1,16 @@
 package scatterPlot;
 
-import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.ComponentEvent;
-import java.awt.event.ComponentListener;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JDialog;
-import javax.swing.JFrame;
 import javax.swing.JPanel;
-import javax.swing.JSlider;
 import javax.swing.JTextField;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
+import javax.swing.SwingConstants;
 
 public class Option extends JDialog {
 	public boolean showTick = false;
@@ -34,7 +28,7 @@ public class Option extends JDialog {
 		panel.add(showTickCheck);
 
 		final IntegerTextField intervalField = new IntegerTextField();
-		intervalField.setHorizontalAlignment(JTextField.RIGHT);
+		intervalField.setHorizontalAlignment(SwingConstants.RIGHT);
 		intervalField.setText(tickInterval + "");
 		intervalField.setPreferredSize(new Dimension(100, 20));
 
