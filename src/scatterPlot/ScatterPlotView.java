@@ -73,8 +73,6 @@ import edu.umd.cs.piccolo.util.PAffineTransform;
 import edu.umd.cs.piccolo.util.PDimension;
 
 public class ScatterPlotView {
-	// UI initialize
-	boolean closeRequested = false;
 
 	// database
 	static ScatterPlotModel spModel;
@@ -110,12 +108,11 @@ public class ScatterPlotView {
 			4);
 	double smallFilter = log2(0.1);
 	double equalFilter = 1;
-	List<DoubleAndInt> smallSortedDots = new ArrayList<DoubleAndInt>();
-	List<DoubleAndInt> diffSortedDots = new ArrayList<DoubleAndInt>();
+	// List<DoubleAndInt> smallSortedDots = new ArrayList<DoubleAndInt>();
+	// List<DoubleAndInt> diffSortedDots = new ArrayList<DoubleAndInt>();
 	DotFilteringWorker filteringWorker = new DotFilteringWorker();
 	Thread t = new Thread(filteringWorker);
 
-	boolean isAdjusting = false;
 	JSlider equalSlider;
 	JSlider smallSlider;
 	JCheckBox scaleCheckBox;
@@ -125,11 +122,7 @@ public class ScatterPlotView {
 	// is log scale
 	boolean isLogScale = true;
 
-	boolean screenShotRequested = false;
-
 	JLabel statusLabel;
-
-	boolean nowLoading = false;
 
 	PCanvas canvas = new PCanvas();
 	PLayer dotLayer;
@@ -153,13 +146,13 @@ public class ScatterPlotView {
 
 	synchronized void fileChanged() {
 		updateMinXY();
+		dots.clear();
 		xColumnList.setModel(new DefaultComboBoxModel<String>(spModel
 				.getDataColumnNames()));
 		xColumnList.setSelectedIndex(0);
 		yColumnList.setModel(new DefaultComboBoxModel<String>(spModel
 				.getDataColumnNames()));
 		yColumnList.setSelectedIndex(1);
-		double margin = (max - min) / 20.0;
 		scaleCheckBox.setSelected(true);
 		equalSlider.setMaximum((int) (spModel.getMaxA() * 1000));
 		equalSlider.setMinimum(1000);
@@ -180,7 +173,7 @@ public class ScatterPlotView {
 				rightPanel.add(getHistogram());
 			}
 		}
-		rightPanel.revalidate();
+		drawEverything();
 	}
 
 	void initFilters() {
@@ -202,6 +195,9 @@ public class ScatterPlotView {
 		}
 	}
 
+	/*
+	 * start함수내의 무한 루프가 빠지고 대신 <code>drawEverything</code>이란 함수에서 랜더링 작업을 수행한다.
+	 */
 	public void start() {
 		updateMinXY();
 		makeColorMap();
@@ -209,15 +205,18 @@ public class ScatterPlotView {
 		initLayout();
 		drawEverything();
 
-		canvas.setVisible(true);
 		mainFrame.pack();
-
 		mainFrame.setVisible(true);
 		mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
 	}
 
 	private void drawEverything() {
+		if (dotLayer != null) {
+			canvas.getCamera().removeLayer(dotLayer);
+		}
+		if (axisLayer != null) {
+			canvas.getCamera().removeLayer(axisLayer);
+		}
 		dotLayer = getDotsLayer();
 		axisLayer = getAxisLayer();
 		canvas.getCamera().addLayer(axisLayer);
@@ -306,9 +305,6 @@ public class ScatterPlotView {
 				xAxisLabel.setOffset(dim.getWidth() - xAxisLabel.getWidth(),
 						dim.getHeight());
 				maxX = spModel.getMax(xIndex);
-				if (smallSortedDots.size() != 0) {
-					resort();
-				}
 				resetDots();
 				if (axisLayer != null) {
 					axisLayer.repaint();
@@ -328,9 +324,6 @@ public class ScatterPlotView {
 						yAxisLabel.getWidth());
 				maxY = spModel.getMax(yIndex);
 				resetDots();
-				if (smallSortedDots.size() != 0) {
-					resort();
-				}
 				if (axisLayer != null) {
 					axisLayer.repaint();
 				}
@@ -432,6 +425,7 @@ public class ScatterPlotView {
 		detailTable.setRowSorter(getRowSorter(detailTable));
 
 		JScrollPane tablePane = new JScrollPane(detailTable);
+		tablePane.setPreferredSize(new Dimension(600, 300));
 		rightPanel.add(tablePane);
 
 		scaleCheckBox = new JCheckBox("Log Scale");
@@ -460,10 +454,10 @@ public class ScatterPlotView {
 		rightPanel.add(histogramView);
 	}
 
-	private void resort() {
-		Collections.sort(smallSortedDots, new SmallComp());
-		Collections.sort(diffSortedDots, new DiffComp());
-	}
+	// private void resort() {
+	// Collections.sort(smallSortedDots, new SmallComp());
+	// Collections.sort(diffSortedDots, new DiffComp());
+	// }
 
 	private TableRowSorter<TableModel> getRowSorter(JTable table) {
 		TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(
@@ -532,12 +526,6 @@ public class ScatterPlotView {
 				final JSlider me = (JSlider) e.getSource();
 				me.setToolTipText("" + equalFilter);
 				equalTextField.setText("" + me.getValue() / 1000.0);
-				isAdjusting = false;
-			}
-
-			@Override
-			public void mousePressed(MouseEvent e) {
-				isAdjusting = true;
 			}
 		});
 		equalSlider.addChangeListener(new ChangeListener() {
@@ -610,8 +598,10 @@ public class ScatterPlotView {
 				tableFilter.set(1, new RowFilter<Object, Object>() {
 					public boolean include(
 							Entry<? extends Object, ? extends Object> entry) {
-						double x = Double.parseDouble("" + entry.getValue(1));
-						double y = Double.parseDouble("" + entry.getValue(2));
+						double x = Double.parseDouble(""
+								+ entry.getValue(xIndex + 1));
+						double y = Double.parseDouble(""
+								+ entry.getValue(yIndex + 1));
 						double a;
 						if (x == y) {
 							a = 1;
@@ -820,17 +810,6 @@ public class ScatterPlotView {
 		smallTextField.setFocusable(true);
 
 		smallSliderPanel.add(smallSlider);
-		smallSlider.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseReleased(MouseEvent e) {
-				isAdjusting = false;
-			}
-
-			@Override
-			public void mousePressed(MouseEvent e) {
-				isAdjusting = true;
-			}
-		});
 		smallSlider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent arg0) {
@@ -903,8 +882,8 @@ public class ScatterPlotView {
 				tableFilter.set(0, new RowFilter<Object, Object>() {
 					public boolean include(
 							Entry<? extends Object, ? extends Object> entry) {
-						int col1 = xColumnList.getSelectedIndex() + 1;
-						int col2 = yColumnList.getSelectedIndex() + 1;
+						int col1 = xIndex + 1;
+						int col2 = yIndex + 1;
 						// +1 은 이름 때문에
 						if (isLogScale) {
 							if (Math.log(Double.parseDouble(""
@@ -995,14 +974,12 @@ public class ScatterPlotView {
 				fileDialog.show();
 				File file = fileDialog.getFile();
 				if (file != null) {
-					nowLoading = true;
 					xAxisLabel.setVisible(false);
 					yAxisLabel.setVisible(false);
 					xMaxLabel.setVisible(false);
 					yMaxLabel.setVisible(false);
 					spModel.readTXTData(file.getPath());
 					fileChanged();
-					nowLoading = false;
 					xAxisLabel.setVisible(true);
 					yAxisLabel.setVisible(true);
 					xMaxLabel.setVisible(true);
@@ -1146,12 +1123,12 @@ public class ScatterPlotView {
 			}
 			di.i = i;
 
-			smallSortedDots.add(di);
-			diffSortedDots.add(di);
+			// smallSortedDots.add(di);
+			// diffSortedDots.add(di);
 
 			layer.addChild(dot);
 		}
-		resort();
+		// resort();
 		return layer;
 	}
 
